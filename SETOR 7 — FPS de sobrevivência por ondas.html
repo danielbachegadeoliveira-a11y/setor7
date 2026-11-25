@@ -1,0 +1,2915 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SETOR 7 — FPS de sobrevivência por ondas</title>
+<style>
+/* Skip artifact shell — fixed styles served beside every artifact.
+   Tokens, utilities and components (basecoat 1.0 markup, no CDN); artifacts
+   override --accent for their own identity. */
+:root {
+  color-scheme: light dark;
+  --accent: #2563eb;
+  --accent-contrast: #ffffff;
+  --accent-text: color-mix(in srgb, var(--accent) 72%, #000);
+  --bg: #f8f9fb;
+  --surface: #ffffff;
+  --text: #14171f;
+  --text-muted: #5b6472;
+  --border: rgba(20, 23, 31, 0.10);
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(20, 23, 31, 0.08);
+  --space: 16px;
+  --success: #0a7a35;
+  --danger: #c0262d;
+  --warning: #8a5300;
+}
+/* Theme resolution. Without data-theme the viewer's system preference decides,
+   as it always did. With it, the artifact's own choice wins in BOTH directions:
+   a page that hardcodes one palette must not be handed the opposite set of
+   tokens by the machine it happens to be opened on. The dark values appear
+   twice because a media query cannot be folded into a selector list.
+   The attribute sits inside :where() so these blocks keep the specificity of a
+   bare :root — the page's own <style> is linked after this file and must go on
+   overriding any token it wants, exactly as it could before. */
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --accent-text: color-mix(in srgb, var(--accent) 78%, #fff);
+    --bg: #101318;
+    --surface: #181c23;
+    --text: #eef1f6;
+    --text-muted: #9aa4b2;
+    --border: rgba(238, 241, 246, 0.12);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --success: #4ade80;
+    --danger: #f87171;
+    --warning: #fbbf24;
+  }
+}
+:root:where([data-theme="dark"]) {
+  color-scheme: dark;
+  --accent-text: color-mix(in srgb, var(--accent) 78%, #fff);
+  --bg: #101318;
+  --surface: #181c23;
+  --text: #eef1f6;
+  --text-muted: #9aa4b2;
+  --border: rgba(238, 241, 246, 0.12);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --success: #4ade80;
+  --danger: #f87171;
+  --warning: #fbbf24;
+}
+:root:where([data-theme="light"]) { color-scheme: light; }
+/* Pages generated before the shell had its own components still link the
+   basecoat CDN, which reads its own tokens and switches theme only on a
+   .dark class. Bridged to the shell's, whatever of it those pages use takes
+   the page's accent and follows the declared theme. Its --accent token is a
+   hover tint, renamed in its theme as --color-accent; the shell's --accent is
+   the brand colour, so the tint is derived from it here. */
+:root {
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-contrast);
+  --secondary: color-mix(in srgb, var(--text) 7%, var(--surface));
+  --secondary-foreground: var(--text);
+  --muted: color-mix(in srgb, var(--text) 5%, var(--surface));
+  --muted-foreground: var(--text-muted);
+  --color-accent: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  --color-accent-foreground: var(--text);
+  --destructive: var(--danger);
+  --input: var(--border);
+  --ring: var(--accent);
+}
+* { box-sizing: border-box; }
+/* The reset the pages were written against: they all linked basecoat, which
+   ships Tailwind's. Its components now live here, so the reset does too. */
+*, ::before, ::after, ::backdrop { margin: 0; padding: 0; border: 0 solid; }
+/* Preflight's rule too: without it a component class that sets display
+   (.alert, .card, .btn…) beats the hidden attribute and shows the element. */
+[hidden]:where(:not([hidden="until-found"])) { display: none !important; }
+.hidden { display: none !important; }
+h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; }
+a { color: inherit; text-decoration: inherit; }
+b, strong { font-weight: bolder; }
+ol, ul, menu { list-style: none; }
+svg, video, canvas, iframe { display: block; vertical-align: middle; }
+button, input, select, textarea { color: inherit; background-color: transparent; border-radius: 0; }
+table { border-collapse: collapse; }
+hr { height: 0; color: inherit; border-top-width: 1px; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; display: block; }
+
+.shell-container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+.shell-section { padding: calc(var(--space) * 2) 0; }
+.shell-grid { display: grid; gap: var(--space); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.shell-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: var(--space); }
+.shell-footer { padding: 24px 0 40px; color: var(--text-muted); font-size: 13px; }
+
+.shell-hero { padding: calc(var(--space) * 3) 0 calc(var(--space) * 2); }
+.shell-hero h1 { font-size: clamp(26px, 4vw, 40px); line-height: 1.15; margin: 0 0 10px; text-wrap: balance; }
+.shell-hero p { color: var(--text-muted); max-width: 60ch; margin: 0; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space);
+}
+
+.kpi { display: flex; flex-direction: column; gap: 4px; }
+.kpi .kpi-value { font-size: clamp(22px, 2.3vw, 28px); font-weight: 650; line-height: 1.1; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.kpi .kpi-label { font-size: 13px; color: var(--text-muted); }
+.kpi .kpi-delta { font-size: 12.5px; font-weight: 600; }
+.kpi .kpi-delta.up { color: var(--success); }
+.kpi .kpi-delta.down { color: var(--danger); }
+
+table.shell-table { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.shell-table th {
+  text-align: left; font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 600;
+}
+table.shell-table th, table.shell-table td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--border); }
+table.shell-table td.num, table.shell-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+.chart-box { width: 100%; min-height: 220px; }
+.chart-box svg { width: 100%; height: auto; display: block; }
+.chart-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 12px; font-size: 12.5px; color: var(--text-muted); }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.chart-legend b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.muted { color: var(--text-muted); }
+.accent { color: var(--accent-text); }
+.shell-badge, .eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent-text);
+}
+/* A pill keeps its content width inside flex and grid columns, which would
+   otherwise stretch it across the card; a centred parent still centres it. */
+.shell-badge, .eyebrow, .badge { width: fit-content; max-width: 100%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell-fade { animation: shell-fade 400ms ease both; }
+  @keyframes shell-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+
+/* Layout and type utilities: what the pages kept spelling in style="".
+   Spacing and type sizes follow Tailwind's scale; there is no Tailwind. */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: var(--space); }
+.between { justify-content: space-between; }
+.grow { flex: 1 1 0; min-width: 0; }
+.cols-2, .cols-3, .cols-4, .cols-5 { display: grid; gap: var(--space); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 720px) {
+  .cols-2, .cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cols-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1000px) { .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.gap-1 { gap: 4px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; } .gap-6 { gap: 24px; }
+.m-0 { margin: 0; }
+.mt-1 { margin-top: 4px; } .mt-2 { margin-top: 8px; } .mt-3 { margin-top: 12px; } .mt-4 { margin-top: 16px; } .mt-6 { margin-top: 24px; }
+.mb-1 { margin-bottom: 4px; } .mb-2 { margin-bottom: 8px; } .mb-3 { margin-bottom: 12px; } .mb-4 { margin-bottom: 16px; } .mb-6 { margin-bottom: 24px; }
+.p-2 { padding: 8px; } .p-3 { padding: 12px; } .p-4 { padding: 16px; } .p-6 { padding: 24px; }
+.text-xs { font-size: 12px; } .text-sm { font-size: 14px; } .text-base { font-size: 16px; }
+.text-lg { font-size: 18px; } .text-xl { font-size: 20px; line-height: 1.35; }
+.text-2xl { font-size: 24px; line-height: 1.25; } .text-3xl { font-size: 30px; line-height: 1.2; }
+.font-medium { font-weight: 500; } .font-semibold { font-weight: 600; } .font-bold { font-weight: 700; }
+.text-right { text-align: right; } .text-center { text-align: center; }
+.nowrap { white-space: nowrap; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.w-full { width: 100%; }
+.text-success { color: var(--success); } .text-danger { color: var(--danger); } .text-warning { color: var(--warning); }
+
+/* Components, with basecoat 1.0 markup (variants and sizes are data
+   attributes) and the shell tokens, so a page needs neither component CSS
+   nor a CSS framework. An older page that also links basecoat gets these
+   rules after it, over the same properties. */
+button, input, select, textarea { font: inherit; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: calc(var(--radius) - 2px);
+  background: var(--accent); color: var(--accent-contrast);
+  font-size: 14px; font-weight: 500; line-height: 1; white-space: nowrap; text-decoration: none; cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.btn:hover { background: color-mix(in srgb, var(--accent) 86%, #000); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+.btn[data-variant="secondary"] { background: color-mix(in srgb, var(--text) 8%, var(--surface)); color: var(--text); }
+.btn[data-variant="secondary"]:hover { background: color-mix(in srgb, var(--text) 14%, var(--surface)); }
+.btn[data-variant="outline"] { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn[data-variant="ghost"] { background: transparent; color: var(--text); }
+.btn[data-variant="outline"]:hover, .btn[data-variant="ghost"]:hover { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.btn[data-variant="destructive"] { background: var(--danger); color: var(--bg); }
+.btn[data-variant="destructive"]:hover { background: color-mix(in srgb, var(--danger) 86%, var(--text)); }
+.btn[data-variant="link"] { height: auto; padding: 0; background: none; color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.btn[data-size="sm"] { height: 30px; padding: 0 10px; font-size: 13px; }
+.btn[data-size="lg"] { height: 42px; padding: 0 20px; font-size: 15px; }
+.btn[data-size="icon"] { width: 36px; padding: 0; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border: 1px solid transparent; border-radius: 999px; background: var(--accent); color: var(--accent-contrast);
+  font-size: 12px; font-weight: 600; line-height: 1.5; white-space: nowrap;
+}
+.badge[data-variant="secondary"] { background: color-mix(in srgb, var(--text) 8%, var(--surface)); color: var(--text); }
+.badge[data-variant="outline"] { background: transparent; color: var(--text); border-color: var(--border); }
+.badge[data-variant="destructive"] { background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--danger); }
+
+.alert {
+  display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); font-size: 14px;
+}
+.alert h2, .alert h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.alert p, .alert section { margin: 0; color: var(--text-muted); }
+.alert[data-variant="destructive"] { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 7%, var(--surface)); color: var(--danger); }
+
+.card {
+  display: flex; flex-direction: column; gap: 16px; padding: 20px 0;
+  border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px);
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow);
+}
+.card > header, .card > section, .card > footer { padding: 0 20px; }
+.card > header { display: grid; gap: 4px; }
+.card > header h2, .card > header h3 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3; }
+.card > header p { margin: 0; color: var(--text-muted); font-size: 14px; }
+.card > footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.input {
+  width: 100%; min-height: 36px; padding: 6px 12px; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px);
+  background: var(--surface); color: var(--text); font-size: 14px;
+}
+textarea.input { min-height: 84px; resize: vertical; }
+.input::placeholder { color: var(--text-muted); }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 14px; font-weight: 500; }
+.field [role="alert"] { color: var(--danger); font-size: 13px; }
+
+dialog.dialog {
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); margin: auto; padding: 0;
+  border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px);
+  background: var(--surface); color: var(--text); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+dialog.dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+dialog.dialog > div { display: grid; gap: 16px; padding: 24px; }
+dialog.dialog header { display: grid; gap: 4px; }
+dialog.dialog header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+dialog.dialog header p { margin: 0; color: var(--text-muted); font-size: 14px; }
+dialog.dialog footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.tabs { display: grid; gap: 12px; }
+.tabs > [role="tablist"] {
+  display: inline-flex; gap: 4px; width: fit-content; max-width: 100%; padding: 4px; overflow-x: auto;
+  border-radius: var(--radius); background: color-mix(in srgb, var(--text) 6%, var(--surface));
+}
+.tabs [role="tab"] {
+  padding: 6px 12px; border: 0; border-radius: calc(var(--radius) - 4px); background: transparent;
+  color: var(--text-muted); font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer;
+}
+.tabs [role="tab"][aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.tabs [role="tabpanel"][hidden] { display: none; }
+
+.accordion > details { border-bottom: 1px solid var(--border); }
+.accordion > details > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 0; font-weight: 500; list-style: none; cursor: pointer;
+}
+.accordion > details > summary::-webkit-details-marker { display: none; }
+.accordion > details > summary::after { content: "+"; color: var(--text-muted); font-size: 18px; line-height: 1; }
+.accordion > details[open] > summary::after { content: "\2212"; }
+.accordion > details > :not(summary) { margin: 0 0 14px; color: var(--text-muted); }
+
+.toaster {
+  position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; flex-direction: column-reverse; gap: 8px;
+  width: min(360px, calc(100vw - 32px)); pointer-events: none;
+}
+.toaster .toast { pointer-events: auto; transition: opacity 200ms ease, transform 200ms ease; }
+.toaster .toast[aria-hidden="true"] { opacity: 0; transform: translateY(8px); }
+.toaster .toast-content {
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); font-size: 13px;
+}
+.toaster .toast-content h2 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+.toaster .toast-content p { margin: 0; color: var(--text-muted); }
+
+/* skipUI building blocks. */
+.skip-table-search { max-width: 320px; margin-bottom: 12px; }
+.skip-table-wrap { overflow-x: auto; }
+table.shell-table th[data-sort] { cursor: pointer; user-select: none; }
+table.shell-table th[aria-sort="ascending"]::after { content: " \25B2"; font-size: 9px; }
+table.shell-table th[aria-sort="descending"]::after { content: " \25BC"; font-size: 9px; }
+table.shell-table td.skip-table-empty { color: var(--text-muted); text-align: center; padding: 24px 0; }
+.skip-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+.toaster .toast[data-type="success"] .toast-content { border-left: 3px solid var(--success); }
+.toaster .toast[data-type="error"] .toast-content { border-left: 3px solid var(--danger); }
+
+</style>
+<script>
+/* Skip artifact shell — fixed helpers served beside every artifact. */
+(function () {
+  "use strict";
+
+  var fmt = {
+    num: function (v, opts) { return new Intl.NumberFormat("pt-BR", opts || {}).format(v); },
+    brl: function (v) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v); },
+    pct: function (v) { return new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 }).format(v); },
+    compact: function (v) { return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(v); },
+    brlCompact: function (v) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1 }).format(v); }
+  };
+
+  // axisLabels formats the five y-axis ticks in the unit the chart declared
+  // (percent, BRL or plain numbers), compact so long values never clip, with
+  // the fewest decimals that still print every tick exactly (1,5 mi, not 2 mi).
+  function axisLabels(format, ticks) {
+    function at(digits) {
+      var opts = { notation: "compact", maximumFractionDigits: digits };
+      if (format === "pct") opts = { style: "percent", maximumFractionDigits: digits };
+      else if (format === "brl") opts = { style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: digits };
+      var nf = new Intl.NumberFormat("pt-BR", opts);
+      return ticks.map(function (t) { return nf.format(t); });
+    }
+    for (var digits = 0; digits < 2; digits++) {
+      if (at(digits).join("|") === at(digits + 1).join("|")) return at(digits);
+    }
+    return at(2);
+  }
+
+  // yAxisPad formats the ticks and measures the left padding they need from
+  // the longest one; drawYAxis then draws the grid and the labels.
+  function yAxisPad(format, max) {
+    var labels = axisLabels(format, [0, max / 4, max / 2, (max * 3) / 4, max]);
+    var longest = labels.reduce(function (m, l) { return Math.max(m, l.length); }, 0);
+    return { labels: labels, padL: Math.max(40, Math.round(longest * 6.2) + 14) };
+  }
+  function drawYAxis(svg, axis, W, padR, padT, plotH) {
+    for (var g = 0; g <= 4; g++) {
+      var gy = padT + plotH - (plotH * g) / 4;
+      svg.appendChild(svgEl("line", { x1: axis.padL, y1: gy, x2: W - padR, y2: gy, stroke: "currentColor", "stroke-opacity": 0.08 }));
+      var lbl = svgEl("text", { x: axis.padL - 8, y: gy + 4, "text-anchor": "end", "font-size": 10, fill: mutedColor() });
+      lbl.textContent = axis.labels[g];
+      svg.appendChild(lbl);
+    }
+  }
+
+  // xLabelStep: show every k-th category label so labels never overlap, and
+  // always the last one (counted back from the end).
+  function xLabelStep(labels, step) {
+    var longest = labels.reduce(function (m, l) { return Math.max(m, String(l).length); }, 0);
+    return Math.max(1, Math.ceil((longest * 6.4 + 8) / Math.max(step, 1)));
+  }
+  function drawXLabel(svg, text, x, y, W, edgeGuard) {
+    var anchor = "middle";
+    var half = String(text).length * 3.2;
+    if (edgeGuard && x - half < 4) anchor = "start";
+    if (edgeGuard && x + half > W - 4) anchor = "end";
+    var tx = svgEl("text", { x: x, y: y, "text-anchor": anchor, "font-size": 11, fill: mutedColor() });
+    tx.textContent = text;
+    svg.appendChild(tx);
+  }
+  // categoryLines fits a bar's category name in its slot: one line, two lines
+  // split at a space, or cut with "…". A bar without its name can't be read, so
+  // categories are never skipped; null when the slot is too narrow for that.
+  function categoryLines(text, slot) {
+    var fit = Math.floor((slot - 6) / 6.4);
+    var s = String(text);
+    if (fit < 4) return null;
+    if (s.length <= fit) return [s];
+    var cut = function (t) { return t.length <= fit ? t : t.slice(0, fit - 1).trimEnd() + "…"; };
+    var best = -1;
+    for (var i = 0; i < s.length; i++) {
+      if (s[i] === " " && (best < 0 || Math.abs(s.length / 2 - i) < Math.abs(s.length / 2 - best))) best = i;
+    }
+    if (best < 0) return [cut(s)];
+    return [cut(s.slice(0, best)), cut(s.slice(best + 1))];
+  }
+  function legend(el, items) {
+    var box = document.createElement("div");
+    box.className = "chart-legend";
+    items.forEach(function (it) {
+      var row = document.createElement("span");
+      var dot = document.createElement("i");
+      dot.style.background = it.color;
+      row.appendChild(dot);
+      row.appendChild(document.createTextNode((it.label || "") + (it.value ? " " : "")));
+      if (it.value) {
+        var v = document.createElement("b");
+        v.textContent = it.value;
+        row.appendChild(v);
+      }
+      box.appendChild(row);
+    });
+    resolve(el).appendChild(box);
+  }
+  var seriesPalette = ["#1baf7a", "#eda100", "#e34948", "#4a3aa7", "#e87ba4", "#0ea5b7"];
+
+  // format accepts a function OR one of the fmt names ("num" | "brl" | "pct").
+  // A page's function may return nothing or throw: the chart prints its
+  // number instead of taking the rest of the page script down with it.
+  function coerceFormat(spec) {
+    if (typeof spec === "function") {
+      return function (v) {
+        try {
+          var out = spec(v);
+          return out == null ? "" : String(out);
+        } catch (e) {
+          return fmt.num(v);
+        }
+      };
+    }
+    if (typeof spec === "string" && fmt[spec]) return fmt[spec];
+    return function (v) { return fmt.num(v); };
+  }
+
+  function accent() {
+    return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2563eb";
+  }
+  function mutedColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue("--text-muted").trim() || "#5b6472";
+  }
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function frame(el, w, h) {
+    var svg = svgEl("svg", { viewBox: "0 0 " + w + " " + h, role: "img" });
+    el = resolve(el);
+    el.innerHTML = "";
+    el.appendChild(svg);
+    return svg;
+  }
+
+  // maxOf guards the axis scale: empty values would give -Infinity (truthy,
+  // so "|| 1" can't catch it) and a non-positive max would flip the chart.
+  // finite reads a chart value as a number, 0 when it is not one (NaN,
+  // Infinity, a stray string), so one bad value cannot blank the axis.
+  function finite(v) {
+    var n = +v;
+    return isFinite(n) ? n : 0;
+  }
+
+  function maxOf(values) {
+    var m = values.length ? Math.max.apply(null, values.map(finite)) : 0;
+    return m > 0 ? m : 1;
+  }
+
+  // labelsFor pads or trims the category names to the n points drawn: pages
+  // pass labels and values of different lengths, and one throw here loses
+  // every section the page renders after the chart.
+  function labelsFor(cfg, n) {
+    var out = [];
+    for (var i = 0; i < n; i++) out.push(cfg.labels && cfg.labels[i] != null ? String(cfg.labels[i]) : "");
+    return out;
+  }
+
+  // niceMax rounds the scale up so the four grid steps land on round values
+  // (1, 1.5, 2, 2.5, 3, 4, 5, 6 or 8 × 10^k) and the tick labels read exactly.
+  function niceMax(max) {
+    var raw = max / 4;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var res = raw / mag;
+    var steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    var nice = steps.filter(function (s) { return s >= res - 1e-9; })[0];
+    return nice * mag * 4;
+  }
+
+  // bar(el, {labels:[], values:[], color?, format?}) — vertical bar chart.
+  function bar(el, cfg) {
+    var W = 640, H = 280, padB = 30, padT = 12, padR = 12;
+    var max = niceMax(maxOf(cfg.values));
+    var axis = yAxisPad(cfg.format, max);
+    var svg = frame(el, W, H);
+    var n = cfg.values.length;
+    var labels = labelsFor(cfg, n);
+    var plotW = W - axis.padL - padR;
+    var step = plotW / n, bw = Math.min(step * 0.62, 64);
+    var names = labels.map(function (l) { return categoryLines(l, step); });
+    var named = names.every(Boolean);
+    if (named && names.some(function (l) { return l.length > 1; })) padB = 42;
+    var plotH = H - padT - padB;
+    var color = cfg.color || accent();
+    var f = coerceFormat(cfg.format);
+    var every = xLabelStep(labels, step);
+    drawYAxis(svg, axis, W, padR, padT, plotH);
+    cfg.values.forEach(function (v, i) {
+      var bh = Math.max(0, (finite(v) / max) * plotH);
+      var x = axis.padL + i * step + (step - bw) / 2;
+      var y = padT + plotH - bh;
+      var r = svgEl("rect", { x: x, y: y, width: bw, height: bh, rx: 4, fill: (cfg.colors && cfg.colors[i]) || color });
+      var t = svgEl("title", {});
+      t.textContent = labels[i] + ": " + f(v);
+      r.appendChild(t);
+      svg.appendChild(r);
+      if (named) {
+        names[i].forEach(function (text, li) {
+          drawXLabel(svg, text, x + bw / 2, padT + plotH + 18 + li * 13, W, false);
+        });
+      } else if ((n - 1 - i) % every === 0) {
+        drawXLabel(svg, labels[i], x + bw / 2, H - 10, W, false);
+      }
+    });
+  }
+
+  // line(el, {labels:[], values:[] | series:[{label, values, color?}], color?, format?})
+  // — one line, or several series on one scale with a legend under the chart.
+  function line(el, cfg) {
+    var W = 640, H = 280, padB = 30, padT = 12, padR = 16;
+    var series = cfg.series && cfg.series.length
+      ? cfg.series
+      : [{ label: "", values: cfg.values || [], color: cfg.color }];
+    var all = [];
+    series.forEach(function (s) { all = all.concat(s.values || []); });
+    var max = niceMax(maxOf(all));
+    var axis = yAxisPad(cfg.format, max);
+    var svg = frame(el, W, H);
+    var n = series.reduce(function (m, s) { return Math.max(m, (s.values || []).length); }, 0);
+    var labels = labelsFor(cfg, n);
+    var plotW = W - axis.padL - padR, plotH = H - padT - padB;
+    var f = coerceFormat(cfg.format);
+    drawYAxis(svg, axis, W, padR, padT, plotH);
+    var xs = labels.map(function (_, i) { return axis.padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1)); });
+    var every = xLabelStep(labels, n > 1 ? plotW / (n - 1) : plotW);
+    labels.forEach(function (label, i) {
+      if ((n - 1 - i) % every === 0) drawXLabel(svg, label, xs[i], H - 10, W, true);
+    });
+    var colors = series.map(function (s, si) {
+      return s.color || (si === 0 ? (cfg.color || accent()) : seriesPalette[(si - 1) % seriesPalette.length]);
+    });
+    series.forEach(function (s, si) {
+      var color = colors[si];
+      var pts = (s.values || []).map(function (v, i) { return [xs[i], padT + plotH - (finite(v) / max) * plotH]; });
+      var d = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+      svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round" }));
+      pts.forEach(function (p, i) {
+        var c = svgEl("circle", { cx: p[0], cy: p[1], r: 3.5, fill: color });
+        var t = svgEl("title", {});
+        t.textContent = (s.label ? s.label + " · " : "") + labels[i] + ": " + f(s.values[i]);
+        c.appendChild(t);
+        svg.appendChild(c);
+      });
+    });
+    if (series.length > 1) {
+      legend(el, series.map(function (s, si) { return { label: s.label, color: colors[si] }; }));
+    }
+  }
+
+  // donut(el, {labels:[], values:[], colors?, format?, center?, centerLabel?, legend?})
+  // — donut with a short total in the centre (compact, in the declared unit)
+  // and, with legend: true, the labels and shares listed under it.
+  function donut(el, cfg) {
+    var W = 320, H = 280, cx = W / 2, cy = H / 2, R = 92, r = 58;
+    var svg = frame(el, W, H);
+    // At 100% of a wide container the donut outgrows the height pages give
+    // the box and spills over the next section: keep it at its own size.
+    svg.style.maxWidth = W + "px";
+    svg.style.margin = "0 auto";
+    var values = cfg.values.map(finite);
+    var labels = labelsFor(cfg, values.length);
+    var sum = values.reduce(function (a, b) { return a + b; }, 0);
+    var total = sum || 1;
+    var palette = cfg.colors || [accent()].concat(seriesPalette);
+    // The hover keeps the full value; the centre has room for a short one.
+    var full = coerceFormat(cfg.format);
+    var short = typeof cfg.format === "function" ? full : cfg.format === "brl" ? fmt.brlCompact : fmt.compact;
+    var a0 = -Math.PI / 2;
+    values.forEach(function (v, i) {
+      var a1 = a0 + (v / total) * Math.PI * 2;
+      var large = a1 - a0 > Math.PI ? 1 : 0;
+      var p = ["M", cx + R * Math.cos(a0), cy + R * Math.sin(a0),
+        "A", R, R, 0, large, 1, cx + R * Math.cos(a1), cy + R * Math.sin(a1),
+        "L", cx + r * Math.cos(a1), cy + r * Math.sin(a1),
+        "A", r, r, 0, large, 0, cx + r * Math.cos(a0), cy + r * Math.sin(a0), "Z"].join(" ");
+      var path = svgEl("path", { d: p, fill: palette[i % palette.length] });
+      var t = svgEl("title", {});
+      t.textContent = labels[i] + ": " + full(v) + " (" + fmt.pct(v / total) + ")";
+      path.appendChild(t);
+      svg.appendChild(path);
+      a0 = a1;
+    });
+    // A share chart has no total worth printing: without its own centre text
+    // the caption alone takes the middle.
+    var text = cfg.center != null ? String(cfg.center) : (cfg.format === "pct" ? "" : short(sum));
+    if (text) {
+      var size = text.length > 9 ? 14 : text.length > 7 ? 17 : 20;
+      var center = svgEl("text", { x: cx, y: cfg.centerLabel ? cy + 1 : cy + 6, "text-anchor": "middle", "font-size": size, "font-weight": 650, fill: "currentColor" });
+      center.textContent = text;
+      svg.appendChild(center);
+    }
+    if (cfg.centerLabel) {
+      var cap = svgEl("text", { x: cx, y: text ? cy + 19 : cy + 5, "text-anchor": "middle", "font-size": 11, fill: mutedColor() });
+      cap.textContent = cfg.centerLabel;
+      svg.appendChild(cap);
+    }
+    if (cfg.legend) {
+      legend(el, labels.map(function (label, i) {
+        return { label: label, color: palette[i % palette.length], value: fmt.pct(values[i] / total) };
+      }));
+    }
+  }
+
+  // ---- Page building blocks: what dashboards and small systems kept
+  // re-implementing — a searchable sortable table, a KPI row, tabs, toasts,
+  // dialogs, saved state and mock data. Every call is opt-in, so a page that
+  // brings its own versions keeps them.
+
+  function resolve(target) {
+    return typeof target === "string" ? document.querySelector(target) : target;
+  }
+
+  function node(tag, className, text) {
+    var el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+
+  function isNumberColumn(col) {
+    return col.align === "right" || col.format === "num" || col.format === "brl" || col.format === "pct";
+  }
+
+  function cellText(col, row) {
+    var value = row[col.key];
+    if (value == null) return "";
+    return col.format ? coerceFormat(col.format)(value) : String(value);
+  }
+
+  function compareValues(a, b) {
+    if (typeof a === "number" && typeof b === "number") return a - b;
+    return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b), "pt-BR", { numeric: true });
+  }
+
+  // table(el, {columns, rows, search?, pageSize?, empty?, onRowClick?}) — a
+  // table.shell-table with sortable headers, an optional search box and
+  // pager. A column is {key, label, format?, align?, sortable? (true),
+  // render?(value, row) returning a Node (data set as text); a returned string
+  // is written with innerHTML, so only for fixed markup with no data}. Plain
+  // values are always set as text.
+  // Returns {setRows, rows}.
+  function table(target, cfg) {
+    var root = resolve(target);
+    var cols = cfg.columns || [];
+    var pageSize = cfg.pageSize || 0;
+    var state = { rows: (cfg.rows || []).slice(), query: "", key: null, dir: 1, page: 0 };
+    root.innerHTML = "";
+    if (cfg.search) {
+      var search = node("input", "input skip-table-search");
+      search.type = "search";
+      search.placeholder = typeof cfg.search === "string" ? cfg.search : "Buscar…";
+      search.setAttribute("aria-label", search.placeholder);
+      search.addEventListener("input", function () {
+        state.query = search.value.trim().toLowerCase();
+        state.page = 0;
+        draw();
+      });
+      root.appendChild(search);
+    }
+    var tableEl = node("table", "shell-table");
+    var headRow = node("tr");
+    var heads = cols.map(function (col) {
+      var th = node("th", isNumberColumn(col) ? "num" : "", col.label == null ? col.key : col.label);
+      th.scope = "col";
+      if (col.sortable !== false) {
+        var toggle = function () {
+          state.dir = state.key === col.key ? -state.dir : 1;
+          state.key = col.key;
+          draw();
+        };
+        th.setAttribute("data-sort", col.key);
+        th.tabIndex = 0;
+        th.addEventListener("click", toggle);
+        th.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+        });
+      }
+      headRow.appendChild(th);
+      return th;
+    });
+    var thead = node("thead");
+    var tbody = node("tbody");
+    var wrap = node("div", "skip-table-wrap");
+    var pager = node("div", "skip-pager");
+    thead.appendChild(headRow);
+    tableEl.appendChild(thead);
+    tableEl.appendChild(tbody);
+    wrap.appendChild(tableEl);
+    root.appendChild(wrap);
+    if (pageSize) root.appendChild(pager);
+
+    function visibleRows() {
+      var rows = state.rows;
+      if (state.query) {
+        rows = rows.filter(function (row) {
+          return cols.some(function (col) { return cellText(col, row).toLowerCase().indexOf(state.query) >= 0; });
+        });
+      }
+      if (state.key) {
+        var key = state.key, dir = state.dir;
+        rows = rows.slice().sort(function (a, b) { return dir * compareValues(a[key], b[key]); });
+      }
+      return rows;
+    }
+
+    function drawRow(row) {
+      var tr = node("tr");
+      cols.forEach(function (col) {
+        var td = node("td", isNumberColumn(col) ? "num" : "");
+        if (!col.render) {
+          td.textContent = cellText(col, row);
+        } else {
+          var content = col.render(row[col.key], row);
+          if (content instanceof Node) td.appendChild(content);
+          else td.innerHTML = content == null ? "" : String(content);
+        }
+        tr.appendChild(td);
+      });
+      // The row stays a row (no role) and takes focus, so a keyboard reaches
+      // the same action; keys pressed on a control inside a cell are its own.
+      if (cfg.onRowClick) {
+        tr.style.cursor = "pointer";
+        tr.tabIndex = 0;
+        tr.addEventListener("click", function () { cfg.onRowClick(row); });
+        tr.addEventListener("keydown", function (e) {
+          if (e.target !== tr || (e.key !== "Enter" && e.key !== " ")) return;
+          e.preventDefault();
+          cfg.onRowClick(row);
+        });
+      }
+      return tr;
+    }
+
+    function pagerButton(label, disabled, step) {
+      var button = node("button", "btn", label);
+      button.type = "button";
+      button.setAttribute("data-variant", "outline");
+      button.setAttribute("data-size", "sm");
+      button.disabled = disabled;
+      button.addEventListener("click", function () { state.page += step; draw(); });
+      return button;
+    }
+
+    function draw() {
+      var rows = visibleRows();
+      heads.forEach(function (th, i) {
+        if (cols[i].key === state.key) th.setAttribute("aria-sort", state.dir > 0 ? "ascending" : "descending");
+        else th.removeAttribute("aria-sort");
+      });
+      var pages = pageSize ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
+      state.page = Math.min(state.page, pages - 1);
+      var shown = pageSize ? rows.slice(state.page * pageSize, (state.page + 1) * pageSize) : rows;
+      tbody.innerHTML = "";
+      if (!shown.length) {
+        var empty = node("td", "skip-table-empty", cfg.empty || "Nenhum registro encontrado.");
+        empty.colSpan = cols.length;
+        tbody.appendChild(node("tr")).appendChild(empty);
+      }
+      shown.forEach(function (row) { tbody.appendChild(drawRow(row)); });
+      if (!pageSize) return;
+      pager.innerHTML = "";
+      var from = rows.length ? state.page * pageSize + 1 : 0;
+      pager.appendChild(node("span", "", from + "–" + Math.min(rows.length, (state.page + 1) * pageSize) + " de " + rows.length));
+      var nav = node("div", "row gap-2");
+      nav.appendChild(pagerButton("Anterior", state.page === 0, -1));
+      nav.appendChild(pagerButton("Próxima", state.page >= pages - 1, 1));
+      pager.appendChild(nav);
+    }
+
+    draw();
+    return {
+      setRows: function (rows) { state.rows = rows.slice(); draw(); },
+      rows: visibleRows
+    };
+  }
+
+  // kpis(el, [{label, value, format?, delta?, hint?}]) — KPI cards in a
+  // responsive grid; delta is a fraction (0.12 renders as ▲ 12%).
+  function kpis(target, items) {
+    var root = resolve(target);
+    root.innerHTML = "";
+    root.classList.add("shell-grid");
+    items.forEach(function (item) {
+      var card = node("div", "panel kpi");
+      card.appendChild(node("span", "kpi-label", item.label));
+      // Large money values go compact ("R$ 27,5 mi"): the full amount does
+      // not fit a KPI card at four per row.
+      var kpiFormat = item.format === "brl" && Math.abs(item.value) >= 1e6 ? fmt.brlCompact : (item.format ? coerceFormat(item.format) : null);
+      card.appendChild(node("span", "kpi-value", kpiFormat ? kpiFormat(item.value) : String(item.value)));
+      if (typeof item.delta === "number") {
+        var up = item.delta >= 0;
+        card.appendChild(node("span", "kpi-delta " + (up ? "up" : "down"), (up ? "▲ " : "▼ ") + fmt.pct(Math.abs(item.delta))));
+      }
+      if (item.hint) card.appendChild(node("span", "kpi-label", item.hint));
+      root.appendChild(card);
+    });
+  }
+
+  // badge(text, variant?) — a .badge node for table cells and lists;
+  // variant is "secondary" | "outline" | "destructive" (default: primary).
+  function badge(text, variant) {
+    var el = node("span", "badge", text);
+    if (variant) el.setAttribute("data-variant", variant);
+    return el;
+  }
+
+  // tabs(el) — wires one .tabs block: [role=tab] buttons inside
+  // [role=tablist], each with aria-controls naming its [role=tabpanel].
+  function tabs(target) {
+    var root = resolve(target);
+    var buttons = Array.prototype.slice.call(root.querySelectorAll('[role="tab"]'));
+    function select(chosen) {
+      buttons.forEach(function (b) {
+        var on = b === chosen;
+        b.setAttribute("aria-selected", on ? "true" : "false");
+        b.tabIndex = on ? 0 : -1;
+        var panel = document.getElementById(b.getAttribute("aria-controls"));
+        if (panel) panel.hidden = !on;
+      });
+    }
+    buttons.forEach(function (b, i) {
+      b.addEventListener("click", function () { select(b); });
+      b.addEventListener("keydown", function (e) {
+        var step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+        if (!step) return;
+        var next = buttons[(i + step + buttons.length) % buttons.length];
+        next.focus();
+        select(next);
+      });
+    });
+    select(buttons.filter(function (b) { return b.getAttribute("aria-selected") === "true"; })[0] || buttons[0]);
+  }
+
+  // toast(message, {type?: "success" | "error", title?, duration?}) — a
+  // .toast in a shared .toaster at the bottom of the page.
+  function toast(message, opts) {
+    opts = opts || {};
+    var toaster = document.querySelector(".toaster") || document.body.appendChild(node("div", "toaster"));
+    var item = node("div", "toast");
+    item.setAttribute("role", opts.type === "error" ? "alert" : "status");
+    item.setAttribute("aria-hidden", "true");
+    if (opts.type) item.setAttribute("data-type", opts.type);
+    var content = node("div", "toast-content");
+    var section = node("section");
+    if (opts.title) section.appendChild(node("h2", "", opts.title));
+    section.appendChild(node("p", "", message));
+    content.appendChild(section);
+    item.appendChild(content);
+    toaster.appendChild(item);
+    requestAnimationFrame(function () { item.setAttribute("aria-hidden", "false"); });
+    setTimeout(function () {
+      item.setAttribute("aria-hidden", "true");
+      setTimeout(function () { item.remove(); }, 400);
+    }, opts.duration || 3000);
+  }
+
+  // Dialogs are native <dialog class="dialog">: a [data-dialog-open="id"]
+  // anywhere opens one, a [data-dialog-close] inside closes it, and a click on
+  // its backdrop closes it too. Plain dialog.showModal()/close() still work.
+  document.addEventListener("click", function (e) {
+    var target = e.target;
+    if (!(target instanceof Element)) return;
+    var opener = target.closest("[data-dialog-open]");
+    if (opener) {
+      var dialog = document.getElementById(opener.getAttribute("data-dialog-open"));
+      if (dialog && dialog.showModal && !dialog.open) dialog.showModal();
+      return;
+    }
+    var closer = target.closest("[data-dialog-close]");
+    if (closer && closer.closest("dialog")) {
+      closer.closest("dialog").close();
+      return;
+    }
+    if (target.tagName === "DIALOG" && target.classList.contains("dialog") && target.open) target.close();
+  });
+
+  // store(key, fallback) — JSON state in localStorage that never throws (a
+  // private window or a full quota falls back to memory): {get, set, update}.
+  function store(key, fallback) {
+    var memory;
+    // Set while the last write did not reach localStorage: what is stored
+    // there is older than memory until a write goes through again.
+    var unsaved = false;
+    var initial = function () { return fallback === undefined ? undefined : JSON.parse(JSON.stringify(fallback)); };
+    function get() {
+      if (!unsaved) {
+        try {
+          var raw = localStorage.getItem(key);
+          if (raw != null) return JSON.parse(raw);
+        } catch (e) { /* storage unavailable: memory below */ }
+      }
+      return memory !== undefined ? memory : initial();
+    }
+    function set(value) {
+      memory = value;
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+        unsaved = false;
+      } catch (e) {
+        unsaved = true;
+      }
+      return value;
+    }
+    return { get: get, set: set, update: function (fn) { return set(fn(get())); } };
+  }
+
+  // mock — seeded random data, so a page asks for 90 days of numbers in one
+  // line instead of writing them out; the same seed gives the same data.
+  var FIRST = ["Ana", "Bruno", "Carla", "Diego", "Eduarda", "Felipe", "Gabriela", "Henrique", "Isabela", "João",
+    "Larissa", "Marcos", "Natália", "Otávio", "Paula", "Rafael", "Sofia", "Thiago", "Vanessa", "Lucas"];
+  var LAST = ["Silva", "Santos", "Oliveira", "Souza", "Pereira", "Costa", "Rodrigues", "Almeida", "Nascimento", "Lima",
+    "Araújo", "Fernandes", "Carvalho", "Gomes", "Martins", "Rocha", "Ribeiro", "Barbosa"];
+  var INITIALS = "ABCDEFGHIJLMNOPRSTV".split("");
+  var CITIES = ["São Paulo, SP", "Rio de Janeiro, RJ", "Belo Horizonte, MG", "Curitiba, PR", "Porto Alegre, RS",
+    "Salvador, BA", "Recife, PE", "Fortaleza, CE", "Brasília, DF", "Goiânia, GO", "Campinas, SP", "Florianópolis, SC",
+    "Manaus, AM", "Belém, PA", "Vitória, ES", "Natal, RN"];
+
+  function createMock(seed) {
+    var state = seed >>> 0;
+    var names = 0;
+    function random() {
+      state = (state + 0x6d2b79f5) >>> 0;
+      var t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    function int(min, max) { return min + Math.floor(random() * (max - min + 1)); }
+    function pick(list) { return list[Math.floor(random() * list.length)]; }
+    var mock = {
+      seed: function (value) { state = value >>> 0; names = 0; return mock; },
+      random: random,
+      int: int,
+      float: function (min, max, decimals) {
+        var factor = Math.pow(10, decimals == null ? 2 : decimals);
+        return Math.round((min + random() * (max - min)) * factor) / factor;
+      },
+      pick: pick,
+      chance: function (p) { return random() < p; },
+      // There are 360 first/last pairs. A page that draws until the name is
+      // new (do { … } while (used.has(name))) froze the tab past them, so
+      // later draws widen the space: a second surname after 200 (6,480), a
+      // middle initial after 4,000.
+      name: function () {
+        names++;
+        var middle = names > 4000 ? pick(INITIALS) + ". " : "";
+        return pick(FIRST) + " " + middle + (names > 200 ? pick(LAST) + " " : "") + pick(LAST);
+      },
+      city: function () { return pick(CITIES); },
+      // series(n, {start, trend, noise, min, decimals}) — a walk: each value
+      // moves by trend (fraction per step) plus up to ±noise of itself.
+      series: function (n, opts) {
+        opts = opts || {};
+        var value = opts.start == null ? 100 : opts.start;
+        var factor = Math.pow(10, opts.decimals || 0);
+        var out = [];
+        for (var i = 0; i < n; i++) {
+          out.push(Math.max(opts.min == null ? 0 : opts.min, Math.round(value * factor) / factor));
+          value = value * (1 + (opts.trend || 0)) * (1 + (random() * 2 - 1) * (opts.noise == null ? 0.08 : opts.noise));
+        }
+        return out;
+      },
+      // dates(n, {end?, step?: "day" | "week" | "month"}) — ISO dates
+      // (YYYY-MM-DD), oldest first, ending at end (default: today).
+      dates: function (n, opts) {
+        opts = opts || {};
+        var end = opts.end ? new Date(opts.end) : new Date();
+        var out = [];
+        for (var i = n - 1; i >= 0; i--) {
+          var d = new Date(end.getTime());
+          if (opts.step === "month") d.setMonth(d.getMonth() - i);
+          else d.setDate(d.getDate() - i * (opts.step === "week" ? 7 : 1));
+          out.push(d.toISOString().slice(0, 10));
+        }
+        return out;
+      },
+      // rows(n, spec) — n objects; each spec value is a function(i), a list
+      // to pick from, or a constant.
+      rows: function (n, spec) {
+        var out = [];
+        for (var i = 0; i < n; i++) {
+          var row = {};
+          for (var key in spec) {
+            var value = spec[key];
+            row[key] = typeof value === "function" ? value(i) : Array.isArray(value) ? pick(value) : value;
+          }
+          out.push(row);
+        }
+        return out;
+      }
+    };
+    return mock;
+  }
+
+  window.skipShell = { fmt: fmt };
+  window.skipChart = { bar: bar, line: line, donut: donut };
+  window.skipUI = { table: table, kpis: kpis, badge: badge, tabs: tabs, toast: toast };
+  window.skipStore = store;
+  window.skipMock = createMock(20261022);
+})();
+
+</script>
+<style>
+:root {
+--accent: #f97316;
+--accent-text: #fb923c;
+--accent-contrast: #111827;
+}
+html, body { height: 100%; margin: 0; background: #0b0d10; color: #e5e7eb; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+#app { position: fixed; inset: 0; }
+#gameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #000; touch-action: none; user-select: none; }
+#hud { position: absolute; inset: 0; pointer-events: none; }
+.hud-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.hud-card { background: rgba(17,24,39,0.72); border: 1px solid rgba(249,115,22,0.35); border-radius: 12px; padding: 8px 12px; backdrop-filter: blur(4px); }
+.hud-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #9ca3af; }
+.hud-value { font-size: 20px; font-weight: 700; color: #f9fafb; }
+.hud-bottom { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.bar { width: 180px; height: 10px; background: #1f2937; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+.bar > div { height: 100%; background: linear-gradient(90deg,#f97316,#fb923c); transition: width .15s; }
+.bar.hp > div { background: linear-gradient(90deg,#dc2626,#22c55e); }
+.weapon-list { display: flex; gap: 6px; margin-top: 6px; }
+.weapon-chip { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid #374151; color: #9ca3af; }
+.weapon-chip.active { border-color: #f97316; color: #fdba74; background: rgba(249,115,22,.12); }
+#minimap { position: absolute; top: 12px; right: 12px; width: 150px; height: 150px; border-radius: 12px; border: 1px solid rgba(249,115,22,0.35); background: rgba(11,13,16,0.72); pointer-events: none; }
+#wave-banner { position: absolute; top: 30%; left: 50%; transform: translate(-50%,-50%); font-size: 28px; font-weight: 800; color: #fdba74; text-shadow: 0 2px 12px #000; opacity: 0; transition: opacity .4s; text-align: center; }
+#wave-banner.show { opacity: 1; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; transform: translate(-50%,-50%); pointer-events: none; }
+#crosshair span { position: absolute; background: #f9fafb; box-shadow: 0 0 2px #000; transition: transform .08s; }
+#mode-banner { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); font-size: 12px; background: rgba(234,179,8,.9); color: #111827; padding: 4px 10px; border-radius: 999px; display: none; }
+#mode-banner.show { display: block; }
+#portrait-warning { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(17,24,39,.92); padding: 12px 16px; border-radius: 12px; font-size: 13px; text-align: center; display: none; pointer-events: none; }
+#touch-controls { position: absolute; inset: 0; pointer-events: none; display: none; }
+#joy-zone { position: absolute; left: 0; bottom: 0; width: 45%; height: 100%; pointer-events: auto; }
+#look-zone { position: absolute; right: 0; top: 0; width: 55%; height: 100%; pointer-events: auto; }
+#joy-knob { position: absolute; width: 70px; height: 70px; border-radius: 50%; background: rgba(249,115,22,.35); border: 2px solid rgba(249,115,22,.7); transform: translate(-50%,-50%); display: none; pointer-events: none; }
+#btn-fire, #btn-reload, #btn-jump, #btn-run { position: absolute; pointer-events: auto; width: 84px; height: 84px; border-radius: 50%; border: 2px solid #fb923c; background: rgba(249,115,22,.35); color: #fff; font-weight: 700; font-size: 14px; }
+#btn-fire { right: 24px; bottom: 90px; }
+#btn-jump { right: 130px; bottom: 60px; width: 72px; height: 72px; }
+#btn-reload { right: 24px; bottom: 200px; width: 64px; height: 64px; }
+#btn-run { right: 120px; bottom: 200px; width: 64px; height: 64px; }
+#stamina-bar { height: 4px; width: 140px; background: #1f2937; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+#stamina-bar > div { height: 100%; background: #38bdf8; transition: width .1s; }
+.overlay { position: absolute; inset: 0; background: rgba(5,7,10,.82); display: flex; align-items: center; justify-content: center; padding: 16px; overflow-y: auto; }
+.overlay.hidden { display: none; }
+.panel-box { max-width: 560px; width: 100%; background: #111827; border: 1px solid #374151; border-radius: 16px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.panel-box h1 { margin: 0; font-size: 34px; letter-spacing: .04em; color: #f9fafb; }
+.panel-box h2 { margin: 0 0 4px; font-size: 20px; color: #f9fafb; }
+.muted-s { color: #9ca3af; font-size: 13px; margin: 4px 0 0; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 10px; margin: 16px 0; }
+.stat-box { background: #0b0d10; border: 1px solid #1f2937; border-radius: 12px; padding: 10px; }
+.stat-box b { display: block; font-size: 22px; color: #fdba74; }
+.stat-box span { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.btn-row .btn { flex: 1; justify-content: center; }
+.diff-group { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 12px; }
+.diff-opt { border: 1px solid #374151; background: #0b0d10; color: #e5e7eb; border-radius: 10px; padding: 10px 6px; cursor: pointer; text-align: center; font-size: 13px; }
+.diff-opt small { display: block; color: #9ca3af; font-size: 11px; margin-top: 4px; }
+.diff-opt.active { border-color: #f97316; background: rgba(249,115,22,.12); }
+.instr { font-size: 13px; color: #d1d5db; line-height: 1.7; margin: 10px 0 0; padding-left: 18px; }
+.eyebrow-pill { display: inline-block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: rgba(249,115,22,.15); color: #fdba74; border: 1px solid rgba(249,115,22,.4); }
+.resume-hint { font-size: 14px; color: #fdba74; margin-top: 12px; }
+.game-footer { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; font-size: 10px; color: #4b5563; pointer-events: none; }
+@media (max-width: 640px) {
+.bar { width: 120px; }
+.hud-value { font-size: 16px; }
+}
+@media print { body * { display: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="gameCanvas"></canvas>
+
+<div id="hud" class="hidden">
+<div class="hud-top">
+<div class="hud-card">
+<div class="hud-label">Onda</div>
+<div class="hud-value" id="hud-wave">1</div>
+<div class="hud-label" style="margin-top:6px">Inimigos</div>
+<div class="hud-value" id="hud-enemies">0</div>
+</div>
+<div class="hud-card" style="text-align:right">
+<div class="hud-label">Pontuação</div>
+<div class="hud-value" id="hud-score">0</div>
+<div class="hud-label" id="hud-combo">Combo x1</div>
+<button class="btn" data-variant="ghost" data-size="sm" id="btn-mute" style="pointer-events:auto;margin-top:6px">Som: ligado</button>
+</div>
+</div>
+<canvas id="minimap" width="150" height="150"></canvas>
+<div id="mode-banner">Modo alternativo: arraste com o botão esquerdo para mirar</div>
+<div id="crosshair">
+<span id="ch-t" style="left:18px;top:0;width:4px;height:12px"></span>
+<span id="ch-b" style="left:18px;top:28px;width:4px;height:12px"></span>
+<span id="ch-l" style="left:0;top:18px;width:12px;height:4px"></span>
+<span id="ch-r" style="left:28px;top:18px;width:12px;height:4px"></span>
+</div>
+<div id="wave-banner"></div>
+<div class="hud-bottom">
+<div class="hud-card">
+<div class="hud-label">Vida</div>
+<div class="hud-value" id="hud-hp">100</div>
+<div class="bar hp"><div id="bar-hp" style="width:100%"></div></div>
+<div id="stamina-bar"><div id="bar-stamina" style="width:100%"></div></div>
+</div>
+<div class="hud-card" style="text-align:right">
+<div class="hud-label" id="hud-weapon-name">Pistola</div>
+<div class="hud-value" id="hud-ammo">12 / 60</div>
+<div class="weapon-list">
+<span class="weapon-chip active" id="chip-1">1 Pistola · cad. 4/s · dano 25 · disp. baixa</span>
+<span class="weapon-chip" id="chip-2">2 Espingarda · cad. 1/s · dano 80 · disp. alta</span>
+</div>
+<div class="bar" id="reload-bar-wrap" style="display:none"><div id="reload-bar" style="width:0%"></div></div>
+</div>
+</div>
+</div>
+
+<div id="touch-controls">
+<div id="joy-zone"></div>
+<div id="look-zone"></div>
+<div id="joy-knob"></div>
+<button id="btn-fire" type="button">TIRO</button>
+<button id="btn-jump" type="button">PULO</button>
+<button id="btn-run" type="button">CORRER</button>
+<button id="btn-reload" type="button">RECARGA</button>
+</div>
+
+<div id="portrait-warning">Gire o aparelho para a orientação paisagem para uma experiência melhor. Você pode jogar mesmo assim.</div>
+
+<div id="overlay-menu" class="overlay">
+<div class="panel-box">
+<span class="eyebrow-pill">Instalação industrial abandonada</span>
+<h1 class="mt-2">SETOR 7</h1>
+<p class="muted-s">Sobreviva às ondas de drones hostis nos corredores do complexo. Cada onda fica mais difícil.</p>
+<div class="stat-row">
+<div class="stat-box"><span>Recorde</span><b id="menu-best">0</b></div>
+<div class="stat-box"><span>Última onda</span><b id="menu-last-wave">—</b></div>
+</div>
+<div>
+<h2>Dificuldade</h2>
+<p class="muted-s">Define o dano e a velocidade dos inimigos.</p>
+<div class="diff-group" id="diff-group">
+<button type="button" class="diff-opt" data-diff="easy">Fácil<small>dano 0,7x · vel. 0,85x</small></button>
+<button type="button" class="diff-opt active" data-diff="normal">Normal<small>dano 1,0x · vel. 1,0x</small></button>
+<button type="button" class="diff-opt" data-diff="hard">Difícil<small>dano 1,5x · vel. 1,2x</small></button>
+</div>
+</div>
+<ul class="instr">
+<li>WASD move · mouse olha sem clique · setas esquerda/direita também giram</li>
+<li>Clique esquerdo atira · Espaço pula · Shift corre (consome estamina)</li>
+<li>R recarrega · 1 e 2 trocam de arma · Esc ou P pausa</li>
+<li>No celular: joystick à esquerda, arrastar à direita para olhar, botões PULO e CORRER</li>
+</ul>
+<p class="muted-s">Coloque seus próprios sprites na mesma pasta do HTML com os nomes bixo1.png, bixo2.png e bixo3.png.</p>
+<div class="btn-row">
+<button class="btn" id="btn-play">Jogar</button>
+<button class="btn" data-variant="outline" id="btn-reset-best">Zerar recorde</button>
+</div>
+</div>
+</div>
+
+<div id="overlay-pause" class="overlay hidden">
+<div class="panel-box">
+<span class="eyebrow-pill">Pausado</span>
+<h2 class="mt-2" style="font-size:26px">Setor 7 em pausa</h2>
+<p class="muted-s">Continue quando estiver pronto. Ao retomar, o mouse volta a mirar.</p>
+<div class="btn-row">
+<button class="btn" id="btn-resume">Continuar</button>
+<button class="btn" data-variant="secondary" id="btn-restart-pause">Reiniciar</button>
+<button class="btn" data-variant="outline" id="btn-menu-pause">Voltar ao menu</button>
+</div>
+</div>
+</div>
+
+<div id="overlay-resume" class="overlay hidden">
+<div class="panel-box" style="text-align:center">
+<span class="eyebrow-pill">Foco perdido</span>
+<h2 class="mt-2" style="font-size:26px">Clique para retomar</h2>
+<p class="muted-s">O jogo foi pausado automaticamente ao perder o foco.</p>
+<p class="resume-hint">Clique em qualquer lugar ou pressione uma tecla para continuar.</p>
+</div>
+</div>
+
+<div id="overlay-over" class="overlay hidden">
+<div class="panel-box">
+<span class="eyebrow-pill">Fim de jogo</span>
+<h2 class="mt-2" style="font-size:26px">Você caiu no Setor 7</h2>
+<p class="muted-s">Volte para tentar bater o recorde.</p>
+<div class="stat-row">
+<div class="stat-box"><span>Onda alcançada</span><b id="over-wave">1</b></div>
+<div class="stat-box"><span>Abates</span><b id="over-kills">0</b></div>
+<div class="stat-box"><span>Precisão</span><b id="over-acc">0%</b></div>
+<div class="stat-box"><span>Pontuação</span><b id="over-score">0</b></div>
+<div class="stat-box"><span>Recorde</span><b id="over-best">0</b></div>
+</div>
+<div class="btn-row">
+<button class="btn" id="btn-again">Jogar de novo</button>
+<button class="btn" data-variant="outline" id="btn-over-menu">Menu</button>
+</div>
+</div>
+</div>
+
+<div id="overlay-wave" class="overlay hidden" style="pointer-events:none;background:transparent">
+</div>
+
+<div class="game-footer">SETOR 7 · FPS de sobrevivência por ondas · desenvolvido com código próprio<br><span id="sprite-status">Sprites · carregando…</span></div>
+</div>
+
+<script>
+(function () {
+"use strict";
+
+// ---------- Constants ----------
+const STORE_KEY = "setor7-save-v2";
+const JUMP_TIME = 0.65;
+const JUMP_HEIGHT = 0.55;
+const JUMP_G = 2 * JUMP_HEIGHT / ((JUMP_TIME / 2) * (JUMP_TIME / 2));
+const JUMP_V = JUMP_G * JUMP_TIME / 2;
+const STAMINA_MAX = 100;
+const STAMINA_DRAIN = 28;
+const STAMINA_REGEN = 18;
+const MOUSE_SENS_DEFAULT = 1;
+const FIXED_DT = 1 / 60;
+const MAX_ACC = 0.25;
+const FOV = Math.PI / 3;
+const PLAYER_RADIUS = 0.25;
+const MAX_HP = 100;
+const RENDER_STEP = 3;
+const MAX_SPRITES = 96;
+const MAX_ENEMIES = 60;
+const MAX_BULLETS = 64;
+const MAX_PARTICLES = 220;
+const MAX_ENEMY_BULLETS = 32;
+const MAX_PICKUPS = 32;
+
+const CREATURE = {
+chaser: { name: "bixo 1", file: "bixo1.png", hp: 30, speed: 2.4, dmg: 22, radius: 0.3, size: 0.7, tint: [255, 40, 40], light: [255, 50, 50], color: [28, 22, 24] },
+shooter: { name: "bixo 2", file: "bixo2.png", hp: 60, speed: 1.3, dmg: 9, radius: 0.3, size: 0.8, tint: [120, 180, 255], light: [150, 210, 255], color: [22, 26, 34] },
+heavy: { name: "bixo 3", file: "bixo3.png", hp: 180, speed: 0.75, dmg: 30, radius: 0.45, size: 1.05, tint: [255, 170, 60], light: [255, 170, 60], color: [30, 24, 22] }
+};
+const SPRITE_FILES = { chaser: "bixo1.png", shooter: "bixo2.png", heavy: "bixo3.png" };
+const SPRITE_IMG = { chaser: null, shooter: null, heavy: null };
+const SPRITE_STATUS = { chaser: "loading", shooter: "loading", heavy: "loading" };
+function loadSprites() {
+for (const key of Object.keys(SPRITE_FILES)) {
+try {
+const img = new Image();
+img.onload = () => { SPRITE_IMG[key] = img; SPRITE_STATUS[key] = "ok"; refreshSpriteStatus(); };
+img.onerror = () => { SPRITE_IMG[key] = null; SPRITE_STATUS[key] = "fallback"; refreshSpriteStatus(); };
+img.src = SPRITE_FILES[key];
+} catch (e) { SPRITE_STATUS[key] = "fallback"; }
+}
+}
+function refreshSpriteStatus() {
+const el = document.getElementById("sprite-status");
+if (!el) return;
+const parts = Object.keys(SPRITE_FILES).map((k) => {
+const st = SPRITE_STATUS[k];
+const label = CREATURE[k].name;
+return label + ": " + (st === "ok" ? "imagem" : st === "fallback" ? "reserva" : "carregando");
+});
+el.textContent = "Sprites · " + parts.join(" · ");
+}
+function enemyTypeForWave(n) {
+return n;
+}
+const DIFFS = {
+easy: { label: "Fácil", dmg: 0.7, spd: 0.85 },
+normal: { label: "Normal", dmg: 1.0, spd: 1.0 },
+hard: { label: "Difícil", dmg: 1.5, spd: 1.2 }
+};
+
+const WEAPONS = [
+{ id: 0, name: "Pistola", rate: 4, dmg: 25, spread: 0.02, reload: 1.0, magSize: 12, reserveMax: 60, pellets: 1, range: 20 },
+{ id: 1, name: "Espingarda", rate: 1, dmg: 80, spread: 0.12, reload: 1.6, magSize: 4, reserveMax: 16, pellets: 6, range: 8 }
+];
+
+// States
+const ST = { MENU: "MENU", PLAYING: "JOGANDO", PAUSED: "PAUSADO", OVER: "GAME_OVER", RESUME: "RESUMO_FOCO" };
+const ALLOWED = {
+MENU: ["JOGANDO"],
+JOGANDO: ["PAUSADO", "GAME_OVER", "RESUMO_FOCO"],
+PAUSADO: ["JOGANDO", "MENU", "RESUMO_FOCO"],
+RESUMO_FOCO: ["JOGANDO", "MENU"],
+GAME_OVER: ["JOGANDO", "MENU"]
+};
+
+// ---------- Map ----------
+// # concreto, M metal, P painel sinalização, . chão, S spawn, E spawn de inimigo, I suprimento
+// Layout 32x32: sala inicial no canto SO, arena central aberta com 4 colunas,
+// dois corredores longos (metal), salas laterais com entrada dupla e anel externo.
+const MAP_ROWS = [
+"################################",
+"#..............................#",
+"#.....EEE......#########.......#",
+"#..............#.......#.......#",
+"#..MMM.........#.......#.......#",
+"#..............#.......#.......#",
+"#.....##.......#...###.#...E...#",
+"#.....##.......#...#.#.#.......#",
+"#...............M..#I#.#.......#",
+"#...........##.....###.........#",
+"#..........#...................#",
+"#..............................#",
+"#.....PPPPPPPP.................#",
+"#.............................E#",
+"#..............................#",
+"#.........................##...#",
+"#...E.....................##...#",
+"#......................MMMM.....#",
+"#..............................#",
+"#.........PPP..................#",
+"#...............................#",
+"#..............................#",
+"#..............................#",
+"#.................##.......E...#",
+"#.................##...........#",
+"#..E.............................#",
+"#..............................#",
+"#.........MMMMMM.........EE....#",
+"#..............................#",
+"#.....I........................#",
+"################################"
+];
+const MAP_H = MAP_ROWS.length;
+const MAP_W = MAP_ROWS[0].length;
+const MAP = new Array(MAP_H);
+const SPAWNS = [];
+for (let y = 0; y < MAP_H; y++) {
+MAP[y] = [];
+for (let x = 0; x < MAP_W; x++) {
+const c = MAP_ROWS[y][x] || "#";
+if (c === "#") MAP[y][x] = 1;
+else if (c === "M") MAP[y][x] = 2;
+else if (c === "P") MAP[y][x] = 3;
+else MAP[y][x] = 0;
+if (c === "E") SPAWNS.push({ x: x + 0.5, y: y + 0.5 });
+}
+}
+const PLAYER_START = { x: 2.5, y: 28.5 };
+const ENEMY_SPAWN_CELLS = [];
+for (const s of SPAWNS) {
+if (Math.hypot(s.x - PLAYER_START.x, s.y - PLAYER_START.y) >= 6) ENEMY_SPAWN_CELLS.push(s);
+}
+const SUPPLY_CELLS = [];
+for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+if (MAP_ROWS[y][x] === "I") SUPPLY_CELLS.push({ x: x + 0.5, y: y + 0.5 });
+}
+(function validateMap() {
+const seen = new Uint8Array(MAP_W * MAP_H);
+const q = [[Math.floor(PLAYER_START.x), Math.floor(PLAYER_START.y)]];
+seen[q[0][1] * MAP_W + q[0][0]] = 1;
+let head = 0;
+while (head < q.length) {
+const [x, y] = q[head++];
+for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+const nx = x + dx, ny = y + dy;
+if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+if (MAP[ny][nx] !== 0 || seen[ny * MAP_W + nx]) continue;
+seen[ny * MAP_W + nx] = 1;
+q.push([nx, ny]);
+}
+}
+})();
+
+function cellAt(x, y) {
+const ix = Math.floor(x), iy = Math.floor(y);
+if (ix < 0 || iy < 0 || ix >= MAP_W || iy >= MAP_H) return 1;
+return MAP[iy][ix];
+}
+function isWall(x, y) { return cellAt(x, y) !== 0; }
+
+// Wall colour per type
+const WALL_COLORS = {
+1: [96, 102, 110],  // concreto cinza chumbo
+2: [84, 66, 52],    // metal ferrugem queimada
+3: [46, 96, 66]     // painel de sinalização verde (acento raro)
+};
+const SIGN_BLUE = [90, 120, 160];
+const LANTERN_FOV = 0.9;
+const LANTERN_RANGE = 9;
+const LIGHTS = [
+{ x: 6.5, y: 2.5, color: [255, 210, 150], r: 4.5, pulse: 1.3, phase: 0, irregular: true },
+{ x: 17.5, y: 7.5, color: [220, 230, 255], r: 4.0, pulse: 2.1, phase: 1.7, irregular: true },
+{ x: 22.5, y: 13.5, color: [255, 190, 120], r: 4.5, pulse: 0.9, phase: 3.1, irregular: false },
+{ x: 9.5, y: 16.5, color: [220, 230, 255], r: 3.5, pulse: 1.7, phase: 0.4, irregular: true },
+{ x: 27.5, y: 22.5, color: [255, 190, 120], r: 4.0, pulse: 2.6, phase: 2.2, irregular: true },
+{ x: 5.5, y: 19.5, color: [200, 220, 255], r: 3.5, pulse: 1.1, phase: 4.0, irregular: false },
+{ x: 14.5, y: 27.5, color: [255, 200, 140], r: 4.5, pulse: 1.5, phase: 5.1, irregular: true },
+{ x: 25.5, y: 28.5, color: [210, 225, 255], r: 3.8, pulse: 2.3, phase: 0.9, irregular: true },
+{ x: 12.5, y: 12.5, color: [255, 60, 50], r: 5.0, pulse: 0.8, phase: 0, spin: true, spinR: 3.5 },
+{ x: 20.5, y: 24.5, color: [255, 60, 50], r: 5.0, pulse: 0.8, phase: 3.0, spin: true, spinR: 3.5 },
+{ x: 25.5, y: 6.5, color: [80, 255, 140], r: 3.2, pulse: 0.5, phase: 0, irregular: false }
+];
+const AMBIENT = 0.16;
+function lightAt(wx, wy) {
+let r = 0, g = 0, b = 0;
+const t = game.time || 0;
+for (const L of LIGHTS) {
+let lx = L.x, ly = L.y;
+if (L.spin) { lx = L.x + Math.cos(t * 0.9 + L.phase) * L.spinR * 0.2; ly = L.y; }
+const d = Math.hypot(wx - lx, wy - ly);
+if (d > L.r) continue;
+let p = 0.75 + 0.25 * Math.sin(t * L.pulse * 6.283 + L.phase);
+if (L.irregular && Math.sin(t * 7.3 + L.phase * 3) > 0.92) p *= 0.2;
+const f = (1 - d / L.r);
+const k = f * f * p;
+if (L.spin) {
+const sw = Math.pow(Math.max(0, Math.cos((Math.atan2(wy - ly, wx - lx)) - t * 1.4)), 6);
+const kk = k * (0.3 + 0.7 * sw);
+r += L.color[0] * kk; g += L.color[1] * kk; b += L.color[2] * kk;
+} else {
+r += L.color[0] * k; g += L.color[1] * k; b += L.color[2] * k;
+}
+}
+return [r / 255, g / 255, b / 255];
+}
+function lanternFactor(rayAng, dist) {
+const d = rayAng - player.angle;
+const a = Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+const ang = Math.max(0, 1 - a / LANTERN_FOV);
+const flick = 0.93 + 0.07 * Math.sin(game.time * 37.0) * Math.sin(game.time * 11.0 + 1.3);
+const dd = Math.max(0, 1 - dist / LANTERN_RANGE);
+return ang * ang * dd * dd * flick;
+}
+function sprintLight(sx, sy, lum) {
+const dx = sx - player.x, dy = sy - player.y;
+const d = Math.hypot(dx, dy);
+const a = Math.atan2(dy, dx) - player.angle;
+const aa = Math.abs(Math.atan2(Math.sin(a), Math.cos(a)));
+const ang = Math.max(0, 1 - aa / (LANTERN_FOV * 1.2));
+const dd = Math.max(0, 1 - d / LANTERN_RANGE);
+return Math.min(1, 0.12 + lum * 0.25 + ang * ang * dd * 0.9);
+}
+let damageDark = 0;
+let grainSeed = 0;
+let dust = [];
+for (let i = 0; i < 70; i++) dust.push({ x: Math.random() * MAP_W, y: Math.random() * MAP_H, z: Math.random(), s: 0.2 + Math.random() * 0.4, ph: Math.random() * 6 });
+let sparks = [];
+const SPARK_SOURCES = [{ x: 6.5, y: 2.5 }, { x: 17.5, y: 7.5 }, { x: 22.5, y: 13.5 }, { x: 14.5, y: 27.5 }];
+
+// ---------- Mutable game state ----------
+let state = ST.MENU;
+let difficulty = "normal";
+let best = 0;
+let lastWave = 0;
+let audioCtx = null;
+let masterGain = null;
+let muted = false;
+let mouseSens = MOUSE_SENS_DEFAULT;
+let soundRead = false;
+
+const player = {
+x: PLAYER_START.x, y: PLAYER_START.y, angle: 0,
+hp: MAX_HP, weapon: 0, ammo: [WEAPONS[0].magSize, WEAPONS[1].magSize],
+reserve: [WEAPONS[0].reserveMax / 2, WEAPONS[1].reserveMax / 4],
+fireCd: 0, reloadT: 0, recoil: 0, bob: 0, bobT: 0, flash: 0,
+shots: 0, hits: 0, kills: 0, combo: 0, comboMult: 1, noHitTime: 0,
+score: 0, damageFlash: 0, shake: 0, moving: false, running: false,
+pitchShake: 0, fireAnim: 0,
+z: 0, vz: 0, grounded: true, stamina: STAMINA_MAX, jumpTime: 0
+};
+
+const game = {
+wave: 1, waveTimer: 0, waveSpawnQueue: [], spawnTimer: 0,
+intermission: false, intermissionT: 0, waveBanner: 0,
+accumulator: 0, time: 0, lastTs: 0, rafId: 0,
+slowmo: 1, mouseMode: "pointer", dragging: false, dragLastX: 0, dragging2: null,
+keys: {}, touchJoy: null, touchLook: null, touchFire: false, touchRun: false,
+mouseDX: 0, mouseHeld: false, lockActive: false, jumpQueued: false,
+prevHitTimer: 0
+};
+
+// Pools
+const enemyPool = [];
+for (let i = 0; i < MAX_ENEMIES; i++) enemyPool.push({ active: false, type: "chaser", x: 0, y: 0, vx: 0, vy: 0, hp: 0, maxHp: 0, speed: 0, dmg: 0, cd: 0, bob: 0, hitFlash: 0, barT: 0, patrolDir: 0, patrolT: 0, radius: 0.3, size: 0.6, color: [0, 0, 0], light: [0, 0, 0] });
+const bulletPool = [];
+for (let i = 0; i < MAX_BULLETS; i++) bulletPool.push({ active: false, x: 0, y: 0, dx: 0, dy: 0, life: 0, dmg: 0 });
+const enemyBulletPool = [];
+for (let i = 0; i < MAX_ENEMY_BULLETS; i++) enemyBulletPool.push({ active: false, x: 0, y: 0, z: 0.9, dx: 0, dy: 0, life: 0, dmg: 0, speed: 0 });
+const particlePool = [];
+for (let i = 0; i < MAX_PARTICLES; i++) particlePool.push({ active: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 0, color: "#fff", size: 2 });
+const pickupPool = [];
+for (let i = 0; i < MAX_PICKUPS; i++) pickupPool.push({ active: false, x: 0, y: 0, type: "ammo", t: 0 });
+const impactPool = [];
+for (let i = 0; i < 16; i++) impactPool.push({ active: false, x: 0, y: 0, life: 0 });
+let impactIdx = 0;
+
+// Pool helper
+function acquire(pool) {
+for (let i = 0; i < pool.length; i++) if (!pool[i].active) { pool[i].active = true; return pool[i]; }
+return null;
+}
+
+// ---------- Persistence ----------
+function defaultSave() { return { version: 2, best: 0, lastWave: 0, difficulty: "normal", muted: false, mouseSens: MOUSE_SENS_DEFAULT }; }
+function validSave(d) {
+if (!d || typeof d !== "object") return false;
+if (typeof d.best !== "number" || !isFinite(d.best) || d.best < 0) return false;
+if (typeof d.lastWave !== "number" || !isFinite(d.lastWave) || d.lastWave < 0) return false;
+if (!DIFFS[d.difficulty]) return false;
+if (typeof d.muted !== "boolean") return false;
+if (typeof d.mouseSens !== "number" || !isFinite(d.mouseSens) || d.mouseSens < 0.2 || d.mouseSens > 3) return false;
+return true;
+}
+function loadSave() {
+try {
+const raw = localStorage.getItem(STORE_KEY);
+if (!raw) return defaultSave();
+const d = JSON.parse(raw);
+if (!validSave(d)) return defaultSave();
+return d;
+} catch (e) { return defaultSave(); }
+}
+function saveSave() {
+try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 2, best, lastWave, difficulty, muted, mouseSens })); } catch (e) {}
+}
+const saved = loadSave();
+best = saved.best; lastWave = saved.lastWave; difficulty = saved.difficulty; muted = saved.muted; mouseSens = saved.mouseSens;
+
+// ---------- DOM refs ----------
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const overlayMenu = document.getElementById("overlay-menu");
+const overlayPause = document.getElementById("overlay-pause");
+const overlayResume = document.getElementById("overlay-resume");
+const overlayOver = document.getElementById("overlay-over");
+const hud = document.getElementById("hud");
+const waveBanner = document.getElementById("wave-banner");
+const modeBanner = document.getElementById("mode-banner");
+const portraitWarn = document.getElementById("portrait-warning");
+const touchUI = document.getElementById("touch-controls");
+const joyKnob = document.getElementById("joy-knob");
+const btnMute = document.getElementById("btn-mute");
+const chT = document.getElementById("ch-t"), chB = document.getElementById("ch-b"), chL = document.getElementById("ch-l"), chR = document.getElementById("ch-r");
+const mmCanvas = document.getElementById("minimap");
+const mmCtx = mmCanvas.getContext("2d");
+
+let W = 320, H = 240, dpr = 1;
+let zBuffer = new Float32Array(160);
+let floorTable = [];
+
+// ---------- Audio (WebAudio, lazy init) ----------
+function ensureAudio() {
+if (audioCtx) return;
+try {
+const AC = window.AudioContext || window.webkitAudioContext;
+if (!AC) return;
+audioCtx = new AC();
+masterGain = audioCtx.createGain();
+masterGain.gain.value = muted ? 0 : 0.35;
+masterGain.connect(audioCtx.destination);
+} catch (e) { audioCtx = null; }
+}
+function tone(freq, dur, type, vol, slide) {
+if (!audioCtx || muted) return;
+try {
+const o = audioCtx.createOscillator();
+const g = audioCtx.createGain();
+o.type = type || "square";
+o.frequency.value = freq;
+if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, slide), audioCtx.currentTime + dur);
+g.gain.value = vol || 0.2;
+g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+o.connect(g); g.connect(masterGain);
+o.start(); o.stop(audioCtx.currentTime + dur);
+} catch (e) {}
+}
+function noise(dur, vol) {
+if (!audioCtx || muted) return;
+try {
+const len = Math.floor(audioCtx.sampleRate * dur);
+const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+const d = buf.getChannelData(0);
+for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+const s = audioCtx.createBufferSource();
+const g = audioCtx.createGain();
+g.gain.value = vol || 0.3;
+s.buffer = buf; s.connect(g); g.connect(masterGain); s.start();
+} catch (e) {}
+}
+const SFX = {
+shot: () => { noise(0.12, 0.35); tone(180, 0.1, "square", 0.15, 60); },
+shotShotgun: () => { noise(0.22, 0.5); tone(120, 0.2, "sawtooth", 0.2, 40); },
+reload: () => { tone(900, 0.06, "square", 0.1); setTimeout(() => tone(600, 0.08, "square", 0.1), 180); },
+impact: () => { tone(400, 0.06, "triangle", 0.12, 150); },
+hurt: () => { tone(160, 0.25, "sawtooth", 0.25, 60); },
+enemyDie: () => { tone(520, 0.2, "triangle", 0.2, 120); },
+waveStart: () => { tone(440, 0.15, "square", 0.15); setTimeout(() => tone(660, 0.2, "square", 0.15), 150); },
+gameOver: () => { tone(300, 0.6, "sawtooth", 0.25, 40); },
+pickup: () => { tone(880, 0.1, "triangle", 0.15); }
+};
+
+// ---------- Canvas / render setup ----------
+function resize() {
+dpr = Math.min(window.devicePixelRatio || 1, 2);
+const cssW = window.innerWidth;
+const cssH = window.innerHeight;
+canvas.style.width = cssW + "px";
+canvas.style.height = cssH + "px";
+canvas.width = Math.floor(cssW * dpr);
+canvas.height = Math.floor(cssH * dpr);
+W = canvas.width; H = canvas.height;
+const cols = Math.ceil(W / RENDER_STEP);
+zBuffer = new Float32Array(cols + 2);
+portraitWarn.style.display = (window.innerHeight > window.innerWidth && window.innerWidth < 700) ? "block" : "none";
+}
+window.addEventListener("resize", resize);
+
+// ---------- Raycaster ----------
+// Pre-computed floor gradient colours per row bucket, drawn per line.
+function castRay(rayAngle) {
+const rdx = Math.cos(rayAngle), rdy = Math.sin(rayAngle);
+let mapX = Math.floor(player.x), mapY = Math.floor(player.y);
+const ddx = Math.abs(1 / (rdx === 0 ? 1e-9 : rdx));
+const ddy = Math.abs(1 / (rdy === 0 ? 1e-9 : rdy));
+let stepX, stepY, sideDistX, sideDistY;
+if (rdx < 0) { stepX = -1; sideDistX = (player.x - mapX) * ddx; } else { stepX = 1; sideDistX = (mapX + 1 - player.x) * ddx; }
+if (rdy < 0) { stepY = -1; sideDistY = (player.y - mapY) * ddy; } else { stepY = 1; sideDistY = (mapY + 1 - player.y) * ddy; }
+let side = 0, hit = 0, cell = 0, guard = 0;
+while (!hit && guard++ < 128) {
+if (sideDistX < sideDistY) { sideDistX += ddx; mapX += stepX; side = 0; }
+else { sideDistY += ddy; mapY += stepY; side = 1; }
+if (mapX < 0 || mapY < 0 || mapX >= MAP_W || mapY >= MAP_H) { hit = 1; cell = 1; break; }
+if (MAP[mapY][mapX] !== 0) { hit = 1; cell = MAP[mapY][mapX]; }
+}
+let perp;
+if (side === 0) perp = (mapX - player.x + (1 - stepX) / 2) / (rdx === 0 ? 1e-9 : rdx);
+else perp = (mapY - player.y + (1 - stepY) / 2) / (rdy === 0 ? 1e-9 : rdy);
+if (perp < 0.0001) perp = 0.0001;
+return { dist: perp, side, cell, mapX, mapY, rdx, rdy, wallX: side === 0 ? player.y + perp * rdy : player.x + perp * rdx };
+}
+
+// Ray-based hit test (used by shots). Returns distance to first wall along ray.
+function wallDistanceAlong(ox, oy, dx, dy, maxD) {
+const r = { x: ox, y: oy };
+let t = 0;
+const step = 0.05;
+while (t < maxD) {
+t += step;
+if (isWall(ox + dx * t, oy + dy * t)) return t;
+}
+return maxD;
+}
+
+// Draw world
+function renderWorld() {
+const halfH = H / 2;
+const horizon = halfH + player.bob * H * 0.02 - player.z * H * 0.35;
+
+const ceilGrad = ctx.createLinearGradient(0, 0, 0, horizon);
+ceilGrad.addColorStop(0, "#020304");
+ceilGrad.addColorStop(1, "#0e1218");
+ctx.fillStyle = ceilGrad;
+ctx.fillRect(0, 0, W, horizon);
+
+const floorGrad = ctx.createLinearGradient(0, horizon, 0, H);
+floorGrad.addColorStop(0, "#15130f");
+floorGrad.addColorStop(0.5, "#0b0a08");
+floorGrad.addColorStop(1, "#000000");
+ctx.fillStyle = floorGrad;
+ctx.fillRect(0, horizon, W, H - horizon);
+
+const cols = Math.ceil(W / RENDER_STEP);
+const angStep = FOV / cols;
+const startAng = player.angle - FOV / 2;
+const fogCol = [18, 24, 32];
+
+for (let c = 0; c < cols; c++) {
+const rayAng = startAng + c * angStep + angStep / 2;
+const hitR = castRay(rayAng);
+const dist = hitR.dist * Math.cos(rayAng - player.angle);
+zBuffer[c] = dist;
+const lineH = Math.min(H * 2, H / dist);
+const drawStart = Math.max(0, horizon - lineH / 2);
+const drawEnd = Math.min(H, horizon + lineH / 2);
+const baseCol = WALL_COLORS[hitR.cell] || WALL_COLORS[1];
+let r = baseCol[0], g = baseCol[1], b = baseCol[2];
+if (hitR.cell === 3) {
+const k = 0.5 + 0.5 * Math.sin(hitR.wallX * 6);
+r = r * 0.7 + SIGN_BLUE[0] * 0.2 * k;
+g = g * 0.7 + SIGN_BLUE[1] * 0.2 * k;
+b = b * 0.7 + SIGN_BLUE[2] * 0.2 * k;
+}
+const wxh = hitR.side === 0 ? hitR.mapX + 0.5 : hitR.mapX + 0.5;
+const wyh = hitR.side === 1 ? hitR.mapY + 0.5 : hitR.mapY + 0.5;
+const lt = lightAt(hitR.mapX + 0.5 + (hitR.rdx * -0.5), hitR.mapY + 0.5 + (hitR.rdy * -0.5));
+const lan = lanternFactor(rayAng, dist);
+const shadeSide = hitR.side === 1 ? 0.6 : 1.0;
+const fogT = Math.min(1, Math.max(0, dist / 13));
+const fogK = Math.pow(1 - fogT, 2.2);
+const litR = (AMBIENT * 0.5 + lan * 0.95 + (lt[0]) * 0.8) * shadeSide * fogK;
+const litG = (AMBIENT * 0.5 + lan * 0.95 + (lt[1]) * 0.7) * shadeSide * fogK;
+const litB = (AMBIENT * 0.5 + lan * 1.0 + (lt[2]) * 0.8) * shadeSide * fogK;
+let cr = r * litR + fogCol[0] * (1 - fogK) * 0.6;
+let cg = g * litG + fogCol[1] * (1 - fogK) * 0.6;
+let cb = b * litB + fogCol[2] * (1 - fogK) * 0.6;
+cr = Math.min(255, cr); cg = Math.min(255, cg); cb = Math.min(255, cb);
+ctx.fillStyle = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
+ctx.fillRect(c * RENDER_STEP, drawStart, RENDER_STEP, drawEnd - drawStart);
+}
+
+const coneGrad = ctx.createRadialGradient(W / 2, H * 0.55, 10, W / 2, H * 0.55, H * 0.8);
+coneGrad.addColorStop(0, "rgba(255,240,210,0.06)");
+coneGrad.addColorStop(1, "rgba(0,0,0,0)");
+ctx.fillStyle = coneGrad;
+ctx.fillRect(0, 0, W, H);
+
+const fogH = ctx.createLinearGradient(0, horizon - 20, 0, horizon + 40);
+fogH.addColorStop(0, "rgba(18,24,32,0)");
+fogH.addColorStop(0.5, "rgba(18,24,32,0.35)");
+fogH.addColorStop(1, "rgba(18,24,32,0)");
+ctx.fillStyle = fogH;
+ctx.fillRect(0, horizon - 20, W, 60);
+
+drawDust();
+
+const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.22, W / 2, H / 2, H * 0.78);
+vg.addColorStop(0, "rgba(0,0,0,0)");
+vg.addColorStop(0.6, "rgba(0,0,0,0.5)");
+vg.addColorStop(1, "rgba(0,0,0,0.92)");
+ctx.fillStyle = vg;
+ctx.fillRect(0, 0, W, H);
+
+const edge = ctx.createRadialGradient(W / 2, H / 2, H * 0.6, W / 2, H / 2, H * 0.9);
+edge.addColorStop(0, "rgba(255,40,40,0)");
+edge.addColorStop(1, "rgba(0,0,0,0)");
+ctx.fillStyle = edge;
+ctx.fillRect(0, 0, W, H);
+
+if (damageDark > 0) {
+const dg = ctx.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, H * 0.7);
+dg.addColorStop(0, "rgba(0,0,0,0)");
+dg.addColorStop(1, `rgba(0,0,0,${Math.min(0.95, damageDark)})`);
+ctx.fillStyle = dg;
+ctx.fillRect(0, 0, W, H);
+}
+
+drawGrain();
+}
+
+function drawDust() {
+const horizon = H / 2 + player.bob * H * 0.02 - player.z * H * 0.35;
+const t = game.time || 0;
+ctx.save();
+for (const d of dust) {
+d.x += Math.sin(t * 0.3 + d.ph) * 0.0015;
+d.y += Math.cos(t * 0.25 + d.ph) * 0.0015;
+const dx = d.x - player.x, dy = d.y - player.y;
+const dist = Math.hypot(dx, dy);
+if (dist > 6 || dist < 0.4) continue;
+const a = Math.atan2(dy, dx) - player.angle;
+const aa = Math.atan2(Math.sin(a), Math.cos(a));
+if (Math.abs(aa) > FOV / 2) continue;
+const sx = W / 2 + (aa / (FOV / 2)) * (W / 2);
+const sy = horizon - (d.z - 0.5) * H * 0.5 / dist * 2 + Math.sin(t * d.s + d.ph) * 6;
+const al = Math.max(0, 0.35 - dist / 20) * Math.max(0, 1 - Math.abs(aa) / (LANTERN_FOV));
+ctx.fillStyle = `rgba(255,236,200,${al})`;
+ctx.fillRect(sx, sy, 2, 2);
+}
+ctx.restore();
+}
+
+function drawGrain() {
+grainSeed = (grainSeed + 1) | 0;
+ctx.fillStyle = "rgba(255,255,255,0.018)";
+for (let i = 0; i < 80; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 1.5, 1.5);
+}
+
+// ---------- Sprite projection ----------
+// Camera plane derived from FOV
+function projectSprite(sx, sy, height, color, glow, alpha) {
+// Inverse camera matrix: transform world to camera space
+const dx = sx - player.x, dy = sy - player.y;
+const dirX = Math.cos(player.angle), dirY = Math.sin(player.angle);
+const planeLen = Math.tan(FOV / 2);
+const planeX = -dirY * planeLen, planeY = dirX * planeLen;
+const invDet = 1 / (planeX * dirY - dirX * planeY);
+const tx = invDet * (dirY * dx - dirX * dy);
+const ty = invDet * (-planeY * dx + planeX * dy);
+if (ty <= 0.1) return null;
+const screenX = Math.floor((W / 2) * (1 + tx / ty));
+const spriteH = Math.abs(Math.floor(H / ty)) * height;
+return { screenX, spriteH, ty, color, glow, alpha };
+}
+
+
+
+// ---------- Enemy definitions ----------
+function pickEnemySpawn() {
+const pts = ENEMY_SPAWN_CELLS.filter((s) => {
+const dx = s.x - player.x, dy = s.y - player.y;
+if (Math.hypot(dx, dy) < 6) return false;
+return !hasLineOfSight(s.x, s.y, player.x, player.y) || Math.hypot(dx, dy) > 9;
+});
+const pool = pts.length ? pts : ENEMY_SPAWN_CELLS.slice().sort((a, b) =>
+Math.hypot(b.x - player.x, b.y - player.y) - Math.hypot(a.x - player.x, a.y - player.y)).slice(0, 4);
+return pool[Math.floor(Math.random() * pool.length)];
+}
+function spawnEnemy(type) {
+const e = acquire(enemyPool);
+if (!e) return null;
+const cell = pickEnemySpawn();
+const c = CREATURE[type] || CREATURE.chaser;
+e.type = type;
+e.x = cell.x; e.y = cell.y;
+e.vx = 0; e.vy = 0;
+e.bob = Math.random() * 6;
+e.hitFlash = 0; e.barT = 0; e.cd = 0;
+e.patrolDir = Math.random() * Math.PI * 2; e.patrolT = 0;
+const dm = DIFFS[difficulty];
+e.maxHp = c.hp;
+e.speed = c.speed * dm.spd;
+e.dmg = c.dmg * dm.dmg;
+e.radius = c.radius;
+e.size = c.size;
+e.color = c.color;
+e.light = c.light;
+e.hp = e.maxHp;
+return e;
+}
+
+function pickWaveQueue(w) {
+const q = [];
+const level = Math.max(1, Math.floor(w));
+const chasers = 6 + Math.floor(level * 2.6);
+const shooters = level >= 2 ? Math.floor(2 + level * 1.2) : 0;
+const heavies = level >= 4 ? Math.floor(1 + (level - 4) * 0.9) : 0;
+for (let i = 0; i < chasers; i++) q.push("chaser");
+for (let i = 0; i < shooters; i++) q.push("shooter");
+for (let i = 0; i < heavies; i++) q.push("heavy");
+// shuffle
+for (let i = q.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [q[i], q[j]] = [q[j], q[i]]; }
+return q.slice(0, MAX_ENEMIES);
+}
+
+function aliveEnemies() {
+let n = 0; for (const e of enemyPool) if (e.active) n++; return n;
+}
+
+// Enemy AI
+function updateEnemy(e, dt) {
+e.bob += dt * 4;
+if (e.hitFlash > 0) e.hitFlash -= dt;
+if (e.barT > 0) e.barT -= dt;
+e.cd -= dt;
+const dx = player.x - e.x, dy = player.y - e.y;
+const dist = Math.hypot(dx, dy);
+if (e.type === "chaser") {
+if (dist > 0.4) {
+const nx = dx / dist, ny = dy / dist;
+moveEnemy(e, nx * e.speed * dt, ny * e.speed * dt);
+}
+if (dist < 0.6 && e.cd <= 0) {
+damagePlayer(e.dmg);
+e.cd = 0.8;
+}
+} else {
+// shooter/heavy: keep distance then patrol
+const desired = e.type === "shooter" ? 4.5 : 2.6;
+let mvx = 0, mvy = 0;
+if (dist > desired + 0.5) { mvx = dx / dist; mvy = dy / dist; }
+else if (dist < desired - 0.8) { mvx = -dx / dist; mvy = -dy / dist; }
+else { e.patrolT -= dt; if (e.patrolT <= 0) { e.patrolDir = Math.random() * Math.PI * 2; e.patrolT = 1.2; } mvx = Math.cos(e.patrolDir) * 0.5; mvy = Math.sin(e.patrolDir) * 0.5; }
+const sp = e.speed * dt;
+moveEnemy(e, mvx * sp, mvy * sp);
+const rate = e.type === "shooter" ? 2.2 : 2.4;
+if (e.cd <= 0 && dist < 9 && hasLineOfSight(e.x, e.y, player.x, player.y)) {
+e.cd = rate;
+fireEnemyBullet(e, e.type === "shooter" ? 6 : 10, e.type === "shooter" ? 4.5 : 3);
+}
+}
+}
+
+function hasLineOfSight(x1, y1, x2, y2) {
+const dist = Math.hypot(x2 - x1, y2 - y1);
+const steps = Math.ceil(dist / 0.1);
+for (let i = 1; i < steps; i++) {
+const t = i / steps;
+if (isWall(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)) return false;
+}
+return true;
+}
+
+// Collision by cell with sliding
+function moveEnemy(e, mx, my) {
+const r = e.radius;
+const nx = e.x + mx;
+if (!isWall(nx + (mx > 0 ? r : -r), e.y) && !isWall(nx + (mx > 0 ? r : -r), e.y - r * 0.9) && !isWall(nx + (mx > 0 ? r : -r), e.y + r * 0.9)) e.x = nx;
+const ny = e.y + my;
+if (!isWall(e.x, ny + (my > 0 ? r : -r)) && !isWall(e.x - r * 0.9, ny + (my > 0 ? r : -r)) && !isWall(e.x + r * 0.9, ny + (my > 0 ? r : -r))) e.y = ny;
+}
+
+// ---------- Projectiles ----------
+function fireEnemyBullet(e, dmg, speed) {
+const b = acquire(enemyBulletPool);
+if (!b) return;
+const dx = player.x - e.x, dy = player.y - e.y;
+const d = Math.hypot(dx, dy) || 1;
+b.x = e.x; b.y = e.y; b.z = 0.9;
+b.dx = dx / d * speed; b.dy = dy / d * speed;
+b.life = 5; b.dmg = dmg * DIFFS[difficulty].dmg; b.speed = speed * 0.8;
+}
+
+function emitParticles(x, y, count, color, speed) {
+for (let i = 0; i < count; i++) {
+const p = acquire(particlePool);
+if (!p) return;
+p.x = x; p.y = y; p.z = 0.5;
+const a = Math.random() * Math.PI * 2;
+const s = (Math.random() * 0.8 + 0.2) * speed;
+p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s; p.vz = 1 + Math.random() * 1.5;
+p.life = 0.6 + Math.random() * 0.4; p.max = p.life;
+p.color = color; p.size = 2 + Math.random() * 3;
+}
+}
+
+function addImpact(x, y) {
+const it = impactPool[impactIdx % impactPool.length];
+impactIdx++;
+it.active = true; it.x = x; it.y = y; it.life = 0.4;
+emitParticles(x, y, 4, "#fdba74", 0.6);
+SFX.impact();
+}
+
+// ---------- Player ----------
+function damagePlayer(amount) {
+if (state !== ST.PLAYING) return;
+damageDark = 0.6;
+if (amount > 0 && player.z > 0) amount = amount;
+player.hp -= amount;
+player.damageFlash = 0.35;
+player.shake = 0.3;
+player.noHitTime = 0;
+if (player.combo > 0 || player.comboMult > 1) { player.combo = 0; player.comboMult = 1; }
+SFX.hurt();
+if (player.hp <= 0) {
+player.hp = 0;
+gameOver();
+}
+}
+
+function heal(v) { player.hp = Math.min(MAX_HP, player.hp + v); }
+
+// Shooting with DDA-equivalent wall check
+function fireWeapon() {
+if (state !== ST.PLAYING) return;
+const wp = WEAPONS[player.weapon];
+if (game.jumpQueued) return;
+if (player.reloadT > 0 || player.fireCd > 0) return;
+if (player.ammo[player.weapon] <= 0) {
+startReload();
+return;
+}
+player.ammo[player.weapon]--;
+player.shots++;
+player.fireCd = 1 / wp.rate;
+player.recoil = 1;
+player.flash = 0.08;
+player.fireAnim = 0.12;
+if (player.weapon === 0) SFX.shot(); else SFX.shotShotgun();
+
+for (let p = 0; p < wp.pellets; p++) {
+const a = player.angle + (Math.random() * 2 - 1) * wp.spread;
+const dx = Math.cos(a), dy = Math.sin(a);
+let best = null, bestT = wp.range;
+const wall = wallDistanceAlong(player.x, player.y, dx, dy, wp.range);
+for (const e of enemyPool) {
+if (!e.active) continue;
+// ray-circle
+const ex = e.x - player.x, ey = e.y - player.y;
+const proj = ex * dx + ey * dy;
+if (proj < 0) continue;
+const perpSq = ex * ex + ey * ey - proj * proj;
+const rr = 0.38 * (e.type === "heavy" ? 1.4 : 1);
+if (perpSq > rr * rr) continue;
+const off = Math.sqrt(Math.max(0, rr * rr - perpSq));
+const t = proj - off;
+if (t < 0.05 || t > wall) continue;
+if (t < bestT) { bestT = t; best = e; }
+}
+if (best) {
+let dmg = wp.dmg;
+if (player.weapon === 1) dmg = Math.max(12, wp.dmg * (1 - bestT / (wp.range * 1.2)) / Math.max(1, wp.pellets * 0.4));
+best.hp -= dmg;
+best.hitFlash = 0.12;
+best.barT = 1.5;
+player.hits++;
+emitParticles(best.x, best.y, 5, "#f87171", 1.2);
+if (best.hp <= 0) killEnemy(best);
+} else {
+const hx = player.x + dx * Math.min(wall, wp.range) * 0.98;
+const hy = player.y + dy * Math.min(wall, wp.range) * 0.98;
+if (wall < wp.range) addImpact(hx, hy);
+}
+}
+}
+
+function killEnemy(e) {
+e.active = false;
+player.kills++;
+const base = e.type === "heavy" ? 250 : e.type === "shooter" ? 150 : 100;
+player.combo++;
+player.noHitTime += 0;
+player.comboMult = Math.min(5, 1 + Math.floor(player.combo / 3));
+player.score += base * player.comboMult;
+emitParticles(e.x, e.y, 14, e.light[0] === 103 ? "#67e8f9" : "#fb923c", 2);
+SFX.enemyDie();
+if (Math.random() < 0.3) spawnPickup(e.x, e.y, Math.random() < 0.5 ? "ammo" : "health");
+}
+
+function spawnPickup(x, y, type) {
+const p = acquire(pickupPool);
+if (!p) return;
+p.x = x; p.y = y; p.type = type; p.t = 0;
+}
+
+function startReload() {
+const w = player.weapon;
+if (player.reloadT > 0) return;
+const wp = WEAPONS[w];
+if (player.ammo[w] >= wp.magSize || player.reserve[w] <= 0) return;
+player.reloadT = wp.reload;
+SFX.reload();
+}
+
+function finishReload() {
+const w = player.weapon;
+const wp = WEAPONS[w];
+const need = wp.magSize - player.ammo[w];
+const take = Math.min(need, player.reserve[w]);
+player.ammo[w] += take;
+player.reserve[w] -= take;
+}
+
+// ---------- Waves ----------
+function startWave(n) {
+game.wave = n;
+game.waveSpawnQueue = pickWaveQueue(n);
+game.spawnTimer = 0;
+game.intermission = false;
+game.waveBanner = 2.5;
+waveBanner.textContent = "ONDA " + n + " — " + game.waveSpawnQueue.length + " drones";
+waveBanner.classList.add("show");
+SFX.waveStart();
+lastWave = Math.max(lastWave, n);
+}
+
+function updateWave(dt) {
+if (game.intermission) {
+game.intermissionT -= dt;
+if (game.intermissionT <= 0) startWave(game.wave + 1);
+return;
+}
+game.spawnTimer -= dt;
+if (game.waveSpawnQueue.length && game.spawnTimer <= 0) {
+const type = game.waveSpawnQueue.shift();
+spawnEnemy(type);
+game.spawnTimer = 0.5;
+}
+if (!game.waveSpawnQueue.length && aliveEnemies() === 0) {
+// wave cleared
+game.intermission = true;
+game.intermissionT = 6;
+player.reserve[0] = Math.min(WEAPONS[0].reserveMax, player.reserve[0] + 14);
+player.reserve[1] = Math.min(WEAPONS[1].reserveMax, player.reserve[1] + 6);
+heal(25);
+player.score += 500 * game.wave;
+waveBanner.textContent = "Onda " + game.wave + " limpa · próxima em 6s · +munição +25 vida";
+waveBanner.classList.add("show");
+game.waveBanner = 4;
+}
+}
+
+// ---------- Update (fixed step) ----------
+function fixedUpdate(dt) {
+if (state !== ST.PLAYING) return;
+game.time += dt;
+updateInput(dt);
+updateWeapons(dt);
+updateEnemies(dt);
+updateProjectiles(dt);
+updateParticles(dt);
+updateWave(dt);
+updateTimers(dt);
+}
+
+function updateInput(dt) {
+const k = game.keys;
+let mx = 0, my = 0;
+if (k["KeyW"]) my += 1;
+if (k["KeyS"]) my -= 1;
+if (k["KeyA"]) mx -= 1;
+if (k["KeyD"]) mx += 1;
+if (game.touchJoy) { mx = game.touchJoy.x; my = -game.touchJoy.y; }
+const len = Math.hypot(mx, my);
+const wantRun = !!(k["ShiftLeft"] || k["ShiftRight"] || game.touchRun);
+let speed = 3.0;
+const running = wantRun && len > 0.05 && player.stamina > 0;
+if (running) { speed = 3.0 * 1.35; player.stamina = Math.max(0, player.stamina - STAMINA_DRAIN * dt); }
+else player.stamina = Math.min(STAMINA_MAX, player.stamina + STAMINA_REGEN * dt);
+player.running = running;
+player.moving = len > 0.05;
+if (len > 0.05) {
+mx /= len; my /= len;
+const cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+const dx = (cos * my - sin * mx) * speed * dt;
+const dy = (sin * my + cos * mx) * speed * dt;
+movePlayer(dx, dy);
+player.bobT += dt * (speed * 2.2);
+}
+if (k["ArrowLeft"]) player.angle -= 2.4 * dt;
+if (k["ArrowRight"]) player.angle += 2.4 * dt;
+if (game.touchLook) player.angle += game.touchLook.dx * 0.012;
+if (game.mouseDX) { player.angle += game.mouseDX * 0.0022 * mouseSens; game.mouseDX = 0; }
+if (game.jumpQueued) { game.jumpQueued = false; tryJump(); }
+updateJump(dt);
+}
+
+function tryJump() {
+if (!player.grounded) return;
+player.grounded = false;
+player.vz = JUMP_V;
+player.jumpTime = 0;
+}
+
+function updateJump(dt) {
+if (player.grounded && player.z === 0) return;
+player.vz -= JUMP_G * dt;
+player.z += player.vz * dt;
+player.jumpTime += dt;
+if (player.z <= 0) {
+const impact = Math.min(1, Math.abs(player.vz) / JUMP_V);
+player.z = 0; player.vz = 0; player.grounded = true;
+player.land = impact;
+player.bob = -impact * 0.6;
+SFX.impact();
+}
+if (player.z > 0 && player.jumpTime > JUMP_TIME * 1.2) { player.z = 0; player.vz = 0; player.grounded = true; }
+if (player.bob && !player.grounded) player.bob *= 0.9;
+if (player.grounded && player.bob) player.bob += (0 - player.bob) * Math.min(1, dt * 8);
+}
+
+function movePlayer(dx, dy) {
+const r = PLAYER_RADIUS;
+// X axis with sliding
+const nx = player.x + dx;
+if (!isWall(nx + (dx > 0 ? r : -r), player.y) && !isWall(nx + (dx > 0 ? r : -r), player.y - r) && !isWall(nx + (dx > 0 ? r : -r), player.y + r)) player.x = nx;
+const ny = player.y + dy;
+if (!isWall(player.x, ny + (dy > 0 ? r : -r)) && !isWall(player.x - r, ny + (dy > 0 ? r : -r)) && !isWall(player.x + r, ny + (dy > 0 ? r : -r))) player.y = ny;
+}
+
+function updateWeapons(dt) {
+if (player.fireCd > 0) player.fireCd -= dt;
+if (player.reloadT > 0) {
+player.reloadT -= dt;
+if (player.reloadT <= 0) { player.reloadT = 0; finishReload(); }
+}
+player.recoil = Math.max(0, player.recoil - dt * 6);
+player.flash = Math.max(0, player.flash - dt);
+player.fireAnim = Math.max(0, player.fireAnim - dt);
+if (player.fireCd > 0 || player.reloadT > 0) {}
+if (game.mouseHeld && WEAPONS[player.weapon].rate >= 2 && player.reloadT <= 0) fireWeapon();
+}
+
+function updateEnemies(dt) {
+for (const e of enemyPool) if (e.active) updateEnemy(e, dt);
+}
+
+function updateProjectiles(dt) {
+for (const b of enemyBulletPool) {
+if (!b.active) continue;
+b.life -= dt;
+b.x += b.dx * dt; b.y += b.dy * dt;
+if (b.life <= 0 || isWall(b.x, b.y)) { b.active = false; continue; }
+const d = Math.hypot(b.x - player.x, b.y - player.y);
+if (d < 0.35 && player.z < b.z) { b.active = false; damagePlayer(b.dmg); }
+else if (d < 0.35 && player.z >= b.z) { /* passou por baixo */ }
+}
+for (const p of pickupPool) {
+if (!p.active) continue;
+p.t += dt;
+if (player.grounded && Math.hypot(p.x - player.x, p.y - player.y) < 0.5) {
+p.active = false;
+if (p.type === "ammo") { player.reserve[0] = Math.min(60, player.reserve[0] + 10); player.reserve[1] = Math.min(16, player.reserve[1] + 3); }
+else heal(20);
+SFX.pickup();
+}
+if (p.t > 25) p.active = false;
+}
+for (const it of impactPool) {
+if (it.active) { it.life -= dt; if (it.life <= 0) it.active = false; }
+}
+}
+
+function updateParticles(dt) {
+for (const p of particlePool) {
+if (!p.active) continue;
+p.life -= dt;
+p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+p.vz -= 6 * dt;
+if (p.life <= 0 || p.z < 0) p.active = false;
+}
+}
+
+function updateTimers(dt) {
+player.damageFlash = Math.max(0, player.damageFlash - dt);
+player.shake = Math.max(0, player.shake - dt);
+player.combo = player.combo;
+player.noHitTime += dt;
+if (player.noHitTime > 6 && player.comboMult > 1) { player.comboMult = 1; }
+game.waveBanner = Math.max(0, game.waveBanner - dt);
+if (game.waveBanner <= 0 && !game.intermission) waveBanner.classList.remove("show");
+}
+
+// ---------- Rendering of entities ----------
+function renderEntities() {
+const sprites = [];
+for (const e of enemyPool) {
+if (!e.active) continue;
+const dx = e.x - player.x, dy = e.y - player.y;
+const d2 = dx * dx + dy * dy;
+sprites.push({ kind: "enemy", e, d2 });
+}
+for (const p of pickupPool) {
+if (!p.active) continue;
+const dx = p.x - player.x, dy = p.y - player.y;
+sprites.push({ kind: "pickup", p, d2: dx * dx + dy * dy });
+}
+for (const b of enemyBulletPool) {
+if (!b.active) continue;
+const dx = b.x - player.x, dy = b.y - player.y;
+sprites.push({ kind: "bullet", b, d2: dx * dx + dy * dy });
+}
+for (const p of particlePool) {
+if (!p.active) continue;
+const dx = p.x - player.x, dy = p.y - player.y;
+sprites.push({ kind: "particle", p, d2: dx * dx + dy * dy });
+}
+sprites.sort((a, b) => b.d2 - a.d2);
+const limit = Math.min(sprites.length, MAX_SPRITES);
+for (let i = 0; i < limit; i++) drawAnySprite(sprites[i]);
+}
+
+function drawAnySprite(s) {
+if (s.kind === "enemy") {
+const e = s.e;
+const dimK = sprintLight(e.x, e.y, 0.15);
+const flashK = e.hitFlash > 0 ? 1 : 0;
+const cr = Math.round(e.color[0] * (0.25 + 0.75 * dimK));
+const cg = Math.round(e.color[1] * (0.25 + 0.75 * dimK));
+const cb = Math.round(e.color[2] * (0.25 + 0.75 * dimK));
+const color = flashK ? "#fef2f2" : `rgb(${cr},${cg},${cb})`;
+const pulse = 0.7 + 0.3 * Math.sin(game.time * 5 + e.bob);
+const gl = e.light;
+const glow = `rgb(${Math.round(gl[0] * pulse)},${Math.round(gl[1] * pulse)},${Math.round(gl[2] * pulse)})`;
+const bob = Math.sin(e.bob) * 0.05;
+const ps = projectSprite(e.x, e.y, e.size + bob, color, glow, 1);
+if (ps) {
+ps.kind = e.type;
+ps.dimK = dimK;
+ps.flash = flashK;
+ps.time = game.time + e.bob;
+ps.dx = e.x - player.x; ps.dy = e.y - player.y;
+ps.worldAng = Math.atan2(ps.dy, ps.dx);
+drawEnemySprite(ps);
+if (e.barT > 0) drawEnemyBar(ps, e);
+}
+} else if (s.kind === "pickup") {
+const p = s.p;
+const ps = projectSprite(p.x, p.y, 0.3, p.type === "ammo" ? "#facc15" : "#22c55e", p.type === "ammo" ? "#fde68a" : "#86efac", 0.9);
+if (ps) drawSpriteWithZ(ps);
+} else if (s.kind === "bullet") {
+const b = s.b;
+const ps = projectSprite(b.x, b.y, 0.22, "#fecaca", "#f87171", 1);
+if (ps) {
+drawSpriteWithZ(ps);
+const gg = ctx.createRadialGradient(ps.screenX, H / 2 - ps.spriteH * 0.2, 1, ps.screenX, H / 2, ps.spriteH * 1.6);
+gg.addColorStop(0, "rgba(248,113,113,0.55)");
+gg.addColorStop(1, "rgba(0,0,0,0)");
+ctx.fillStyle = gg;
+ctx.fillRect(ps.screenX - ps.spriteH * 1.6, H / 2 - ps.spriteH * 1.6, ps.spriteH * 3.2, ps.spriteH * 3.2);
+}
+} else if (s.kind === "particle") {
+const p = s.p;
+const alpha = Math.max(0, p.life / p.max);
+const ps = projectSprite(p.x, p.y, 0.05 * p.size, p.color, p.color, alpha);
+if (ps) drawSpriteWithZ(ps);
+}
+}
+
+function drawEnemySprite(s) {
+if (!s) return;
+const cols = Math.ceil(W / RENDER_STEP);
+const half = Math.max(2, s.spriteH * 0.3);
+let visible = false;
+for (let cx = Math.floor((s.screenX - half) / RENDER_STEP); cx <= Math.floor((s.screenX + half) / RENDER_STEP); cx++) {
+if (cx < 0 || cx >= cols) continue;
+if (zBuffer[cx] > s.ty) { visible = true; break; }
+}
+if (!visible) return;
+const horizon = H / 2 + player.bob * H * 0.02 - player.z * H * 0.35;
+const cfg = CREATURE[s.kind] || CREATURE.chaser;
+const img = SPRITE_IMG[s.kind];
+const floatY = Math.sin(s.time * 2.2 + (s.kind === "heavy" ? 1.3 : s.kind === "shooter" ? 2.6 : 0)) * s.spriteH * 0.03;
+const h = Math.max(2, s.spriteH);
+let w = h * 0.6;
+if (img && img.naturalWidth && img.naturalHeight) w = h * (img.naturalWidth / img.naturalHeight);
+const top = horizon - h * 0.5 + floatY;
+const x = s.screenX;
+const flip = Math.cos(s.worldAng - player.angle) < 0 ? -1 : 1;
+const lum = 0.15 + 0.85 * Math.max(0, 1 - Math.abs(s.screenX - W / 2) / (W * 0.5));
+const lanternBoost = 1 + 0.5 * Math.max(0, 1 - Math.abs(s.screenX - W / 2) / (W * 0.25));
+ctx.save();
+ctx.globalAlpha = s.alpha;
+if (img) {
+ctx.save();
+ctx.translate(x, top);
+ctx.scale(flip, 1);
+ctx.drawImage(img, -w / 2, 0, w, h);
+ctx.restore();
+ctx.save();
+ctx.globalCompositeOperation = "source-atop";
+ctx.globalAlpha = 0.18 * s.alpha;
+const tr = cfg.tint[0], tg = cfg.tint[1], tb = cfg.tint[2];
+const pulse = s.kind === "chaser" ? 0.5 + 0.5 * Math.sin(game.time * 6) : 1;
+ctx.fillStyle = `rgb(${tr},${tg},${tb})`;
+ctx.globalAlpha = 0.18 * s.alpha * pulse;
+ctx.fillRect(x - w / 2, top, w, h);
+ctx.restore();
+} else {
+const base = s.flash ? "#fef2f2" : `rgb(${Math.round(cfg.color[0] * (0.25 + 0.75 * s.dimK))},${Math.round(cfg.color[1] * (0.25 + 0.75 * s.dimK))},${Math.round(cfg.color[2] * (0.25 + 0.75 * s.dimK))})`;
+ctx.fillStyle = base;
+ctx.beginPath();
+ctx.arc(x, top + h * 0.42, h * 0.28, 0, Math.PI * 2);
+ctx.fill();
+ctx.fillRect(x - h * 0.16, top + h * 0.5, h * 0.32, h * 0.5);
+}
+ctx.globalCompositeOperation = "source-over";
+ctx.globalAlpha = s.alpha;
+const dimK = Math.min(1, s.dimK * lanternBoost);
+const silhouette = Math.max(0, 1 - lum * 1.2);
+ctx.fillStyle = `rgba(0,0,0,${Math.min(0.92, silhouette * 0.85 + (1 - dimK) * 0.5)})`;
+ctx.fillRect(x - w / 2 - 2, top - 2, w + 4, h + 4);
+ctx.restore();
+}
+
+function drawSpriteWithZ(s) {
+if (!s) return;
+const cols = Math.ceil(W / RENDER_STEP);
+const c = Math.floor(s.screenX / RENDER_STEP);
+if (c < -2 || c > cols + 2) return;
+const half = Math.max(2, s.spriteH * 0.25);
+let visible = false;
+for (let cx = Math.floor((s.screenX - half) / RENDER_STEP); cx <= Math.floor((s.screenX + half) / RENDER_STEP); cx++) {
+if (cx < 0 || cx >= cols) continue;
+if (zBuffer[cx] > s.ty) { visible = true; break; }
+}
+if (!visible) return;
+const horizon = H / 2 + player.bob * H * 0.02 - player.z * H * 0.35;
+const size = Math.max(1, s.spriteH);
+const top = horizon - size * 0.5;
+const x = s.screenX;
+ctx.save();
+ctx.globalAlpha = s.alpha;
+const gr = ctx.createRadialGradient(x, top + size * 0.45, 1, x, top + size * 0.45, size * 0.55);
+gr.addColorStop(0, s.glow);
+gr.addColorStop(1, "rgba(0,0,0,0)");
+ctx.fillStyle = gr;
+ctx.fillRect(x - size * 0.55, top - size * 0.1, size * 1.1, size * 1.1);
+ctx.fillStyle = s.color;
+ctx.beginPath();
+ctx.arc(x, top + size * 0.45, Math.max(1, size * 0.26), 0, Math.PI * 2);
+ctx.fill();
+ctx.fillStyle = s.glow;
+ctx.fillRect(x - size * 0.08, top + size * 0.42, size * 0.16, size * 0.08);
+ctx.restore();
+}
+
+function drawGameplayRing(x, y, size, color) {
+ctx.save();
+ctx.strokeStyle = color;
+ctx.lineWidth = 1.5;
+ctx.globalAlpha = 0.6;
+ctx.beginPath();
+ctx.arc(x, y, size, 0, Math.PI * 2);
+ctx.stroke();
+ctx.restore();
+}
+
+function drawEnemyBar(ps, e) {
+const x = ps.screenX - 30, y = H / 2 - ps.spriteH * 0.5 - 14;
+ctx.fillStyle = "rgba(0,0,0,0.6)";
+ctx.fillRect(x, y, 60, 6);
+ctx.fillStyle = "#f97316";
+ctx.fillRect(x, y, 60 * Math.max(0, e.hp / e.maxHp), 6);
+}
+
+// Weapon and effects overlay
+function renderWeaponAndEffects() {
+const wp = WEAPONS[player.weapon];
+const bobX = Math.sin(player.bobT) * (player.moving ? 8 : 2) * (player.running ? 1.5 : 1) * dpr;
+const bobY = Math.abs(Math.cos(player.bobT)) * (player.moving ? 6 : 1) * dpr;
+const recoilY = player.recoil * 22 * dpr + Math.max(0, player.land || 0) * 0 + (player.grounded ? 0 : 6 * dpr);
+player.land = Math.max(0, (player.land || 0) - 0.05);
+const reloadOff = player.reloadT > 0 ? Math.sin((1 - player.reloadT / wp.reload) * Math.PI) * 70 * dpr : 0;
+const bx = W * 0.6 + bobX;
+const by = H - 160 * dpr + bobY + recoilY + reloadOff;
+ctx.save();
+ctx.translate(bx, by);
+if (player.weapon === 0) {
+// pistol
+ctx.fillStyle = "#1f2937";
+ctx.fillRect(-40 * dpr, 0, 90 * dpr, 40 * dpr);
+ctx.fillStyle = "#374151";
+ctx.fillRect(-20 * dpr, 40 * dpr, 40 * dpr, 60 * dpr);
+ctx.fillStyle = "#f97316";
+ctx.fillRect(-40 * dpr, 20 * dpr, 90 * dpr, 4 * dpr);
+} else {
+// shotgun
+ctx.fillStyle = "#3f2f22";
+ctx.fillRect(-90 * dpr, 10 * dpr, 220 * dpr, 30 * dpr);
+ctx.fillStyle = "#1f2937";
+ctx.fillRect(-20 * dpr, 35 * dpr, 60 * dpr, 60 * dpr);
+ctx.fillStyle = "#6b7280";
+ctx.fillRect(-100 * dpr, 6 * dpr, 220 * dpr, 12 * dpr);
+}
+if (player.flash > 0) {
+ctx.fillStyle = "rgba(251,191,36,0.9)";
+ctx.beginPath();
+ctx.arc((player.weapon === 0 ? 50 : 110) * dpr, -6 * dpr, 20 * dpr * (player.flash / 0.08), 0, Math.PI * 2);
+ctx.fill();
+}
+ctx.restore();
+
+if (player.flash > 0) {
+const fg = ctx.createRadialGradient(W / 2, H / 2, 2, W / 2, H / 2, 120 * dpr);
+fg.addColorStop(0, "rgba(253,224,71,0.25)");
+fg.addColorStop(1, "rgba(0,0,0,0)");
+ctx.fillStyle = fg;
+ctx.fillRect(0, 0, W, H);
+}
+if (player.damageFlash > 0) {
+ctx.fillStyle = `rgba(220,38,38,${player.damageFlash * 0.45})`;
+ctx.fillRect(0, 0, W, H);
+}
+}
+
+function drawMinimap() {
+const s = 150, cell = s / MAP_W;
+mmCtx.clearRect(0, 0, s, s);
+mmCtx.fillStyle = "rgba(11,13,16,0.72)";
+mmCtx.fillRect(0, 0, s, s);
+mmCtx.fillStyle = "#374151";
+for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+if (MAP[y][x] !== 0) mmCtx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5);
+}
+for (const p of pickupPool) {
+if (!p.active) continue;
+mmCtx.fillStyle = "#3b82f6";
+mmCtx.beginPath();
+mmCtx.arc(p.x * cell, p.y * cell, 2, 0, Math.PI * 2);
+mmCtx.fill();
+}
+for (const e of enemyPool) {
+if (!e.active) continue;
+if (Math.hypot(e.x - player.x, e.y - player.y) >= 8) continue;
+mmCtx.fillStyle = "#ef4444";
+mmCtx.beginPath();
+mmCtx.arc(e.x * cell, e.y * cell, 2.5, 0, Math.PI * 2);
+mmCtx.fill();
+}
+mmCtx.fillStyle = "#22c55e";
+mmCtx.beginPath();
+mmCtx.arc(player.x * cell, player.y * cell, 3.5, 0, Math.PI * 2);
+mmCtx.fill();
+mmCtx.strokeStyle = "#22c55e";
+mmCtx.lineWidth = 1.5;
+mmCtx.beginPath();
+mmCtx.moveTo(player.x * cell, player.y * cell);
+mmCtx.lineTo((player.x + Math.cos(player.angle) * 1.6) * cell, (player.y + Math.sin(player.angle) * 1.6) * cell);
+mmCtx.stroke();
+}
+
+function renderOverlayHUD() {
+drawMinimap();
+// Update HTML HUD
+document.getElementById("hud-wave").textContent = game.wave;
+document.getElementById("hud-enemies").textContent = aliveEnemies() + game.waveSpawnQueue.length;
+document.getElementById("hud-score").textContent = player.score;
+document.getElementById("hud-combo").textContent = "Combo x" + player.comboMult + " · " + player.combo + " abates";
+document.getElementById("hud-hp").textContent = Math.ceil(player.hp);
+document.getElementById("bar-hp").style.width = (player.hp / MAX_HP * 100) + "%";
+document.getElementById("bar-stamina").style.width = (player.stamina / STAMINA_MAX * 100) + "%";
+const wp = WEAPONS[player.weapon];
+document.getElementById("hud-weapon-name").textContent = wp.name;
+document.getElementById("hud-ammo").textContent = player.ammo[player.weapon] + " / " + player.reserve[player.weapon];
+document.getElementById("chip-1").className = "weapon-chip" + (player.weapon === 0 ? " active" : "");
+document.getElementById("chip-2").className = "weapon-chip" + (player.weapon === 1 ? " active" : "");
+const rwrap = document.getElementById("reload-bar-wrap");
+if (player.reloadT > 0) {
+rwrap.style.display = "block";
+document.getElementById("reload-bar").style.width = ((1 - player.reloadT / wp.reload) * 100) + "%";
+} else rwrap.style.display = "none";
+// crosshair dynamic
+const open = 6 + (player.moving ? 6 : 0) + player.recoil * 10;
+chT.style.transform = `translate(0,${-open}px)`;
+chB.style.transform = `translate(0,${open}px)`;
+chL.style.transform = `translate(${-open}px,0)`;
+chR.style.transform = `translate(${open}px,0)`;
+}
+
+// Full render
+function render() {
+if (!W || !H) return;
+ctx.setTransform(1, 0, 0, 1, 0, 0);
+ctx.clearRect(0, 0, W, H);
+if (state === ST.PLAYING || state === ST.PAUSED || state === ST.RESUME || state === ST.OVER) {
+renderWorld();
+renderEntities();
+renderWeaponAndEffects();
+}
+if (state === ST.PLAYING) renderOverlayHUD();
+}
+
+// ---------- Main loop ----------
+function updateAtmosphere(dt) {
+damageDark = Math.max(0, damageDark - dt * 1.5);
+if (player.damageFlash > 0) damageDark = Math.max(damageDark, 0.55);
+for (const d of dust) {
+d.z += dt * 0.02;
+if (d.z > 1) d.z = 0;
+}
+if (Math.random() < dt * 2) {
+const s = SPARK_SOURCES[Math.floor(Math.random() * SPARK_SOURCES.length)];
+sparks.push({ x: s.x, y: s.y, z: 1.0, vx: (Math.random() - 0.5) * 0.4, vz: -0.5 - Math.random(), life: 0.7 });
+}
+for (let i = sparks.length - 1; i >= 0; i--) {
+const sp = sparks[i];
+sp.life -= dt; sp.x += sp.vx * dt; sp.z += sp.vz * dt; sp.vz -= 2 * dt;
+if (sp.life <= 0) sparks.splice(i, 1);
+}
+}
+
+function frame(ts) {
+if (!game.lastTs) game.lastTs = ts;
+let frameTime = (ts - game.lastTs) / 1000;
+game.lastTs = ts;
+if (frameTime > MAX_ACC) frameTime = MAX_ACC;
+if (state === ST.PLAYING) {
+updateAtmosphere(frameTime);
+game.accumulator += frameTime;
+let steps = 0;
+while (game.accumulator >= FIXED_DT && steps < 8) {
+fixedUpdate(FIXED_DT);
+game.accumulator -= FIXED_DT;
+steps++;
+}
+} else {
+game.accumulator = 0;
+}
+render();
+game.rafId = requestAnimationFrame(frame);
+}
+
+// ---------- State machine ----------
+function setState(next) {
+if (state === next) return;
+const allowed = ALLOWED[state] || [];
+if (!allowed.includes(next)) return;
+state = next;
+syncOverlays();
+}
+
+function syncOverlays() {
+overlayMenu.classList.toggle("hidden", state !== ST.MENU);
+overlayPause.classList.toggle("hidden", state !== ST.PAUSED);
+overlayResume.classList.toggle("hidden", state !== ST.RESUME);
+overlayOver.classList.toggle("hidden", state !== ST.OVER);
+hud.classList.toggle("hidden", state !== ST.PLAYING && state !== ST.PAUSED && state !== ST.RESUME && state !== ST.OVER);
+touchUI.style.display = (isTouch() && state === ST.PLAYING) ? "block" : "none";
+if (state === ST.MENU) {
+document.getElementById("menu-best").textContent = best;
+document.getElementById("menu-last-wave").textContent = lastWave || "—";
+}
+if (state !== ST.PLAYING) {
+modeBanner.classList.remove("show");
+}
+}
+
+function isTouch() { return ("ontouchstart" in window) || navigator.maxTouchPoints > 0; }
+
+// Pointer lock
+function requestLock() {
+try {
+const p = canvas.requestPointerLock && canvas.requestPointerLock();
+if (p && p.catch) p.catch(() => {});
+} catch (e) {}
+}
+function releaseLock() {
+try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) {}
+}
+function setAltMode() {
+game.mouseMode = "drag";
+modeBanner.classList.add("show");
+}
+document.addEventListener("pointerlockchange", () => {
+game.lockActive = document.pointerLockElement === canvas;
+modeBanner.classList.remove("show");
+});
+document.addEventListener("pointerlockerror", () => {});
+
+// ---------- Start / restart ----------
+function resetRun() {
+player.x = PLAYER_START.x; player.y = PLAYER_START.y; player.angle = -Math.PI / 2;
+player.z = 0; player.vz = 0; player.grounded = true; player.stamina = STAMINA_MAX; player.jumpTime = 0; player.bob = 0; player.land = 0;
+game.jumpQueued = false; game.mouseDX = 0; game.touchRun = false;
+player.hp = MAX_HP; player.weapon = 0;
+player.ammo = [WEAPONS[0].magSize, WEAPONS[1].magSize];
+player.reserve = [WEAPONS[0].reserveMax / 2, WEAPONS[1].reserveMax / 4];
+player.fireCd = 0; player.reloadT = 0; player.recoil = 0; player.flash = 0;
+player.shots = 0; player.hits = 0; player.kills = 0; player.combo = 0; player.comboMult = 1;
+player.noHitTime = 0; player.score = 0; player.damageFlash = 0; player.shake = 0;
+player.bobT = 0; player.fireAnim = 0;
+for (const e of enemyPool) e.active = false;
+for (const b of enemyBulletPool) b.active = false;
+for (const p of particlePool) p.active = false;
+for (const p of pickupPool) p.active = false;
+for (const it of impactPool) it.active = false;
+game.intermission = false; game.waveBanner = 0; game.accumulator = 0; game.time = 0;
+game.keys = {}; game.touchJoy = null; game.touchLook = null; game.touchFire = false;
+game.mouseHeld = false;
+waveBanner.classList.remove("show");
+}
+
+function spawnInitialSupplies() {
+for (const s of SUPPLY_CELLS) spawnPickup(s.x, s.y, s.x > 16 ? "ammo" : "health");
+}
+
+function startGame() {
+ensureAudio();
+if (audioCtx && audioCtx.state === "suspended") { try { audioCtx.resume(); } catch (e) {} }
+resetRun();
+setState(ST.PLAYING);
+spawnInitialSupplies();
+startWave(1);
+requestLock();
+}
+
+function gameOver() {
+if (state !== ST.PLAYING) return;
+const wave = game.wave;
+const acc = player.shots ? Math.round(player.hits / player.shots * 100) : 0;
+const newRecord = player.score > best;
+if (newRecord) best = player.score;
+lastWave = Math.max(lastWave, wave);
+saveSave();
+setState(ST.OVER);
+releaseLock();
+document.getElementById("over-wave").textContent = wave;
+document.getElementById("over-kills").textContent = player.kills;
+document.getElementById("over-acc").textContent = acc + "%";
+document.getElementById("over-score").textContent = player.score;
+document.getElementById("over-best").textContent = best;
+SFX.gameOver();
+if (newRecord) { try { skipUI.toast("Novo recorde: " + best + " pontos!", { type: "success", title: "SETOR 7" }); } catch (e) {} }
+}
+
+function pauseGame() {
+if (state !== ST.PLAYING) return;
+setState(ST.PAUSED);
+releaseLock();
+}
+function resumeGame() {
+if (state !== ST.PAUSED && state !== ST.RESUME) return;
+setState(ST.PLAYING);
+requestLock();
+}
+function focusLoss() {
+if (state === ST.PLAYING) { setState(ST.RESUME); releaseLock(); }
+else if (state === ST.PAUSED) { setState(ST.RESUME); }
+}
+
+// ---------- Input ----------
+const GAME_KEYS = new Set(["KeyW","KeyA","KeyS","KeyD","ShiftLeft","ShiftRight","Space","KeyR","Digit1","Digit2","KeyE","Escape","KeyP","ArrowLeft","ArrowRight"]);
+document.addEventListener("keydown", (ev) => {
+if (ev.repeat) return;
+const code = ev.code;
+if (state === ST.RESUME) { if (ev.code !== "Escape") { resumeGame(); } return; }
+if (code === "Escape" || code === "KeyP") {
+if (state === ST.PLAYING) pauseGame();
+else if (state === ST.PAUSED) resumeGame();
+return;
+}
+if (state !== ST.PLAYING) return;
+if (GAME_KEYS.has(code)) ev.preventDefault();
+game.keys[code] = true;
+if (code === "KeyR") startReload();
+if (code === "KeyE") startReload();
+if (code === "Digit1") switchWeapon(0);
+if (code === "Digit2") switchWeapon(1);
+if (code === "Space") game.jumpQueued = true;
+});
+document.addEventListener("keyup", (ev) => {
+game.keys[ev.code] = false;
+});
+function switchWeapon(i) {
+if (state !== ST.PLAYING) return;
+if (player.weapon === i) return;
+player.weapon = i;
+player.reloadT = 0;
+player.fireCd = 0.2;
+}
+
+// Mouse
+canvas.addEventListener("mousedown", (ev) => {
+if (state === ST.RESUME) { resumeGame(); return; }
+if (state !== ST.PLAYING) return;
+ensureAudio();
+if (!game.lockActive) requestLock();
+if (ev.button === 0) {
+game.mouseHeld = true;
+fireWeapon();
+} else if (ev.button === 2) {
+startReload();
+}
+});
+window.addEventListener("mouseup", (ev) => {
+if (ev.button === 0) game.mouseHeld = false;
+});
+canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
+window.addEventListener("mousemove", (ev) => {
+if (state !== ST.PLAYING) return;
+const dx = document.pointerLockElement === canvas ? ev.movementX : ev.movementX || 0;
+game.mouseDX += dx;
+});
+
+// Touch
+function setupTouch() {
+const joyZone = document.getElementById("joy-zone");
+const lookZone = document.getElementById("look-zone");
+const btnFire = document.getElementById("btn-fire");
+const btnReload = document.getElementById("btn-reload");
+let joyId = null, joyCx = 0, joyCy = 0;
+joyZone.addEventListener("touchstart", (e) => {
+ensureAudio();
+const t = e.changedTouches[0];
+joyId = t.identifier; joyCx = t.clientX; joyCy = t.clientY;
+joyKnob.style.display = "block";
+joyKnob.style.left = t.clientX + "px";
+joyKnob.style.top = t.clientY + "px";
+game.touchJoy = { x: 0, y: 0 };
+e.preventDefault();
+}, { passive: false });
+joyZone.addEventListener("touchmove", (e) => {
+for (const t of e.changedTouches) if (t.identifier === joyId) {
+const dx = t.clientX - joyCx, dy = t.clientY - joyCy;
+const max = 50;
+const len = Math.min(max, Math.hypot(dx, dy));
+const ang = Math.atan2(dy, dx);
+const kx = Math.cos(ang) * len, ky = Math.sin(ang) * len;
+joyKnob.style.left = (joyCx + kx) + "px";
+joyKnob.style.top = (joyCy + ky) + "px";
+game.touchJoy = { x: kx / max, y: ky / max };
+}
+e.preventDefault();
+}, { passive: false });
+const endJoy = (e) => {
+for (const t of e.changedTouches) if (t.identifier === joyId) {
+joyId = null; game.touchJoy = null; joyKnob.style.display = "none";
+}
+};
+joyZone.addEventListener("touchend", endJoy);
+joyZone.addEventListener("touchcancel", endJoy);
+
+let lookId = null, lookLastX = 0, lookLastY = 0;
+lookZone.addEventListener("touchstart", (e) => {
+ensureAudio();
+const t = e.changedTouches[0];
+lookId = t.identifier; lookLastX = t.clientX; lookLastY = t.clientY;
+game.touchLook = { dx: 0 };
+e.preventDefault();
+}, { passive: false });
+lookZone.addEventListener("touchmove", (e) => {
+for (const t of e.changedTouches) if (t.identifier === lookId) {
+const dx = t.clientX - lookLastX;
+lookLastX = t.clientX; lookLastY = t.clientY;
+game.touchLook = { dx: dx };
+}
+e.preventDefault();
+}, { passive: false });
+const endLook = (e) => {
+for (const t of e.changedTouches) if (t.identifier === lookId) {
+lookId = null; game.touchLook = null;
+}
+};
+lookZone.addEventListener("touchend", endLook);
+lookZone.addEventListener("touchcancel", endLook);
+
+btnFire.addEventListener("touchstart", (e) => { if (state === ST.PLAYING) { game.touchFire = true; fireWeapon(); } e.preventDefault(); }, { passive: false });
+const stopFire = () => { game.touchFire = false; };
+btnFire.addEventListener("touchend", stopFire);
+btnFire.addEventListener("touchcancel", stopFire);
+const btnJump = document.getElementById("btn-jump");
+const btnRun = document.getElementById("btn-run");
+btnJump.addEventListener("touchstart", (e) => { if (state === ST.PLAYING) game.jumpQueued = true; e.preventDefault(); }, { passive: false });
+btnRun.addEventListener("touchstart", (e) => { game.touchRun = true; e.preventDefault(); }, { passive: false });
+const stopRun = () => { game.touchRun = false; };
+btnRun.addEventListener("touchend", stopRun);
+btnRun.addEventListener("touchcancel", stopRun);
+btnReload.addEventListener("touchstart", (e) => { if (state === ST.PLAYING) startReload(); e.preventDefault(); }, { passive: false });
+}
+
+// Focus / visibility
+document.addEventListener("visibilitychange", () => { if (document.hidden) focusLoss(); });
+window.addEventListener("blur", focusLoss);
+document.addEventListener("keyup", (ev) => { if (ev.code === "Space") game.jumpQueued = false; });
+
+// ---------- UI wiring ----------
+function setupUI() {
+document.getElementById("btn-play").addEventListener("click", () => startGame());
+document.getElementById("btn-resume").addEventListener("click", () => resumeGame());
+document.getElementById("btn-again").addEventListener("click", () => startGame());
+document.getElementById("btn-restart-pause").addEventListener("click", () => {
+if (state !== ST.PAUSED) return;
+setState(ST.PLAYING); startGame();
+});
+document.getElementById("btn-menu-pause").addEventListener("click", () => toMenu());
+document.getElementById("btn-over-menu").addEventListener("click", () => toMenu());
+overlayResume.addEventListener("click", () => { if (state === ST.RESUME) resumeGame(); });
+document.getElementById("btn-reset-best").addEventListener("click", () => {
+best = 0; lastWave = 0; saveSave();
+document.getElementById("menu-best").textContent = best;
+document.getElementById("menu-last-wave").textContent = "—";
+try { skipUI.toast("Recorde zerado.", { title: "SETOR 7" }); } catch (e) {}
+});
+document.querySelectorAll("#diff-group .diff-opt").forEach((btn) => {
+btn.addEventListener("click", () => {
+difficulty = btn.dataset.diff;
+document.querySelectorAll("#diff-group .diff-opt").forEach((b) => b.classList.toggle("active", b === btn));
+saveSave();
+try { skipUI.toast("Dificuldade: " + DIFFS[difficulty].label, { title: "SETOR 7" }); } catch (e) {}
+});
+});
+// Set initial difficulty active state from save
+document.querySelectorAll("#diff-group .diff-opt").forEach((b) => b.classList.toggle("active", b.dataset.diff === difficulty));
+btnMute.textContent = "Som: " + (muted ? "desligado" : "ligado");
+btnMute.addEventListener("click", () => {
+ensureAudio();
+muted = !muted;
+if (masterGain) masterGain.gain.value = muted ? 0 : 0.35;
+btnMute.textContent = "Som: " + (muted ? "desligado" : "ligado");
+saveSave();
+});
+const bodyTouch = document.getElementById("touch-controls");
+setupTouch();
+}
+
+function toMenu() {
+releaseLock();
+if (state === ST.PLAYING || state === ST.PAUSED || state === ST.RESUME) {
+setState(ST.MENU);
+} else if (state === ST.OVER) {
+setState(ST.MENU);
+} else {
+setState(ST.MENU);
+}
+}
+
+// ---------- Boot ----------
+function boot() {
+resize();
+setupUI();
+state = ST.MENU;
+syncOverlays();
+lastWave = lastWave || 0;
+document.getElementById("menu-best").textContent = best;
+document.getElementById("menu-last-wave").textContent = lastWave || "—";
+game.rafId = requestAnimationFrame(frame);
+}
+// Map validation ensures spawn exists
+if (SPAWNS.length === 0) SPAWNS.push(PLAYER_START);
+document.addEventListener("DOMContentLoaded", () => { loadSprites(); boot(); });
+window.SETOR7_DEBUG = { ST, player, game };
+})();
+</script>
+</body>
+</html>
